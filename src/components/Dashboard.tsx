@@ -1,0 +1,121 @@
+import React, { useEffect } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import { NuevoGasto } from './NuevoGasto';
+import { ListaGastos } from './ListaGastos';
+import { Configuracion } from './Configuracion';
+import { Resumen } from './Resumen';
+import { useStore } from '../store/useStore';
+import { auth } from '../config/firebase';
+import { LayoutGrid, Settings, PlusCircle, List, LogOut } from 'lucide-react';
+
+export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { cargarGastos } = useStore();
+  const [activeTab, setActiveTab] = React.useState('dashboard');
+
+  useEffect(() => {
+    cargarGastos();
+  }, []);
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    navigate('/login');
+  };
+
+  const tabs = [
+    { id: 'dashboard', name: 'Dashboard', icon: LayoutGrid },
+    { id: 'nuevo', name: 'Nuevo Gasto', icon: PlusCircle },
+    { id: 'lista', name: 'Lista de Gastos', icon: List },
+    { id: 'config', name: 'Configuración', icon: Settings },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <h1 className="text-xl font-bold text-gray-900">Gestión de Gastos</h1>
+              </div>
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+              >
+                <LogOut className="h-5 w-5 mr-2" />
+                Cerrar Sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <div className="sm:hidden">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="hidden sm:block">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`
+                        ${
+                          activeTab === tab.id
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }
+                        group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm
+                      `}
+                    >
+                      <Icon
+                        className={`
+                          ${
+                            activeTab === tab.id
+                              ? 'text-blue-500'
+                              : 'text-gray-400 group-hover:text-gray-500'
+                          }
+                          -ml-0.5 mr-2 h-5 w-5
+                        `}
+                      />
+                      {tab.name}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+        </div>
+
+        <main>
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <Resumen />
+              <ListaGastos />
+            </div>
+          )}
+          {activeTab === 'nuevo' && <NuevoGasto />}
+          {activeTab === 'lista' && <ListaGastos />}
+          {activeTab === 'config' && <Configuracion />}
+        </main>
+      </div>
+    </div>
+  );
+};
