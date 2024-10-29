@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -15,6 +15,16 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+// Establece la persistencia de sesión solo para la duración de la pestaña
+setPersistence(auth, browserSessionPersistence)
+  .then(() => {
+    console.log("Persistencia de sesión establecida para la duración de la pestaña.");
+  })
+  .catch((error) => {
+    console.error("Error al establecer la persistencia de sesión:", error);
+  });
+
 auth.useDeviceLanguage();
 
 export { auth, db };
