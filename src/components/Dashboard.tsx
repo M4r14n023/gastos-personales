@@ -10,12 +10,24 @@ import { LayoutGrid, Settings, PlusCircle, List, LogOut } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { cargarGastos } = useStore();
+  const { cargarGastos, initializeUserData, initialized } = useStore();
   const [activeTab, setActiveTab] = React.useState('dashboard');
 
   useEffect(() => {
-    cargarGastos();
-  }, []);
+    const initData = async () => {
+      if (!initialized) {
+        try {
+          await initializeUserData();
+        } catch (error) {
+          console.error('Error initializing data:', error);
+        }
+      } else {
+        await cargarGastos();
+      }
+    };
+    
+    initData();
+  }, [initialized]);
 
   const handleLogout = async () => {
     await auth.signOut();

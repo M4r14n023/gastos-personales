@@ -3,17 +3,20 @@ import { auth } from '../../config/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
+import { useStore } from '../../store/useStore';
 
 export const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const initializeUserData = useStore(state => state.initializeUserData);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await createUserWithEmailAndPassword(auth, email, password);
+      await initializeUserData();
       navigate('/dashboard');
     } catch (err: any) {
       setError('Error al registrarse: ' + err.message);
