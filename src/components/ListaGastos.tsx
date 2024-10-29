@@ -30,36 +30,43 @@ export const ListaGastos: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {gastos.map((gasto) => (
-              <tr key={gasto.id} className={gasto.esFijo ? 'bg-blue-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {format(new Date(gasto.fecha), 'dd/MM/yyyy', { locale: es })}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {gasto.descripcion}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  ${gasto.monto.toFixed(2)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {getCategoriaNombre(gasto.categoria)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {getMedioPagoNombre(gasto.medioPago)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {gasto.cuotas > 1 ? `${gasto.cuotaActual}/${gasto.cuotas}` : '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => eliminarGasto(gasto.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {gastos.map((gasto) => {
+              const fecha = gasto.fecha ? new Date(gasto.fecha) : null;
+              const fechaFormateada = fecha && !isNaN(fecha.getTime())
+                ? format(fecha, 'dd/MM/yyyy', { locale: es })
+                : 'Fecha inválida';
+
+              return (
+                <tr key={gasto.id} className={gasto.esFijo ? 'bg-blue-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {fechaFormateada}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {gasto.descripcion}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${gasto.monto.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {getCategoriaNombre(gasto.categoria)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {getMedioPagoNombre(gasto.medioPago)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {gasto.cuotas > 1 ? `${gasto.cuotaActual}/${gasto.cuotas}` : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => eliminarGasto(gasto.id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
