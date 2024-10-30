@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Gasto, MedioPago, Categoria } from '../types';
+import { Gasto, MedioPago, Categoria, Ingreso, CategoriaIngreso, Balance } from '../types';
 import { db, auth } from '../config/firebase';
 import { 
   collection, 
@@ -14,28 +14,19 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 
-const defaultCategorias: Omit<Categoria, 'id'>[] = [
-  { nombre: 'Carnicería' },
-  { nombre: 'Verdulería' },
-  { nombre: 'Granja' },
-  { nombre: 'Huevos' },
-  { nombre: 'Nafta' },
-  { nombre: 'Resumen Visa Galicia' },
-  { nombre: 'Resumen Carrefour' },
-  { nombre: 'Gym' },
-  { nombre: 'Tenis Telefonos' }
-];
-
-const defaultMediosPago: Omit<MedioPago, 'id'>[] = [
-  { nombre: 'Efectivo', tipo: 'efectivo' },
-  { nombre: 'Débito Visa', tipo: 'debito' },
-  { nombre: 'Crédito Visa', tipo: 'credito' }
+const defaultCategoriasIngreso: Omit<CategoriaIngreso, 'id'>[] = [
+  { nombre: 'Sueldo' },
+  { nombre: 'Ingreso único' },
+  { nombre: 'Otros' }
 ];
 
 interface State {
   gastos: Gasto[];
+  ingresos: Ingreso[];
   mediosPago: MedioPago[];
   categorias: Categoria[];
+  categoriasIngreso: CategoriaIngreso[];
+  balances: Balance[];
   initialized: boolean;
   loading: boolean;
   error: string | null;
@@ -43,17 +34,25 @@ interface State {
   initializeUserData: () => Promise<void>;
   agregarGasto: (gasto: Omit<Gasto, 'id'>) => Promise<void>;
   eliminarGasto: (id: string) => Promise<void>;
+  agregarIngreso: (ingreso: Omit<Ingreso, 'id'>) => Promise<void>;
+  eliminarIngreso: (id: string) => Promise<void>;
   agregarMedioPago: (medioPago: Omit<MedioPago, 'id'>) => Promise<void>;
   eliminarMedioPago: (id: string) => Promise<void>;
   agregarCategoria: (categoria: Omit<Categoria, 'id'>) => Promise<void>;
   eliminarCategoria: (id: string) => Promise<void>;
+  agregarCategoriaIngreso: (categoria: Omit<CategoriaIngreso, 'id'>) => Promise<void>;
+  eliminarCategoriaIngreso: (id: string) => Promise<void>;
+  generarCierreBalance: () => Promise<void>;
   setError: (error: string | null) => void;
 }
 
 export const useStore = create<State>((set, get) => ({
   gastos: [],
+  ingresos: [],
   mediosPago: [],
   categorias: [],
+  categoriasIngreso: [],
+  balances: [],
   initialized: false,
   loading: false,
   error: null,
@@ -69,6 +68,7 @@ export const useStore = create<State>((set, get) => ({
       const batch = writeBatch(db);
       const categoriasRef = collection(db, 'categorias');
       const mediosPagoRef = collection(db, 'mediosPago');
+      const categoriasIngresoRef = collection(db, 'categoriasIngreso');
       
       // Check if user already has data
       const categoriasQuery = query(categoriasRef, where('userId', '==', auth.currentUser.uid));
@@ -98,12 +98,25 @@ export const useStore = create<State>((set, get) => ({
           });
           nuevosMediosPago.push({ ...medioPago, id: docRef.id });
         }
+
+        // Initialize default income categories
+        const nuevasCategoriasIngreso: CategoriaIngreso[] = [];
+        for (const categoria of defaultCategoriasIngreso) {
+          const docRef = doc(categoriasIngresoRef);
+          batch.set(docRef, {
+            ...categoria,
+            userId: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          });
+          nuevasCategoriasIngreso.push({ ...categoria, id: docRef.id });
+        }
         
         await batch.commit();
         
         set({
           categorias: nuevasCategorias,
           mediosPago: nuevosMediosPago,
+          categoriasIngreso: nuevasCategoriasIngreso,
           initialized: true
         });
       }
@@ -126,6 +139,9 @@ export const useStore = create<State>((set, get) => ({
       const categoriasRef = collection(db, 'categorias');
       const mediosPagoRef = collection(db, 'mediosPago');
       const gastosRef = collection(db, 'gastos');
+      const ingresosRef = collection(db, 'ingresos');
+      const categoriasIngresoRef = collection(db, 'categoriasIngreso');
+      const balancesRef = collection(db, 'balances');
 
       // Set up real-time listeners
       const unsubscribeCategorias = onSnapshot(
@@ -136,10 +152,6 @@ export const useStore = create<State>((set, get) => ({
             ...doc.data()
           })) as Categoria[];
           set({ categorias });
-        },
-        (error) => {
-          console.error('Error al escuchar categorías:', error);
-          set({ error: 'Error al cargar categorías' });
         }
       );
 
@@ -151,10 +163,6 @@ export const useStore = create<State>((set, get) => ({
             ...doc.data()
           })) as MedioPago[];
           set({ mediosPago });
-        },
-        (error) => {
-          console.error('Error al escuchar medios de pago:', error);
-          set({ error: 'Error al cargar medios de pago' });
         }
       );
 
@@ -170,10 +178,47 @@ export const useStore = create<State>((set, get) => ({
             };
           }) as Gasto[];
           set({ gastos });
-        },
-        (error) => {
-          console.error('Error al escuchar gastos:', error);
-          set({ error: 'Error al cargar gastos' });
+        }
+      );
+
+      const unsubscribeIngresos = onSnapshot(
+        query(ingresosRef, where('userId', '==', auth.currentUser.uid)),
+        (snapshot) => {
+          const ingresos = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              fecha: data.fecha?.toDate() || new Date(),
+            };
+          }) as Ingreso[];
+          set({ ingresos });
+        }
+      );
+
+      const unsubscribeCategoriasIngreso = onSnapshot(
+        query(categoriasIngresoRef, where('userId', '==', auth.currentUser.uid)),
+        (snapshot) => {
+          const categoriasIngreso = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as CategoriaIngreso[];
+          set({ categoriasIngreso });
+        }
+      );
+
+      const unsubscribeBalances = onSnapshot(
+        query(balancesRef, where('userId', '==', auth.currentUser.uid)),
+        (snapshot) => {
+          const balances = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              fecha: data.fecha?.toDate() || new Date(),
+            };
+          }) as Balance[];
+          set({ balances });
         }
       );
 
@@ -183,6 +228,9 @@ export const useStore = create<State>((set, get) => ({
           unsubscribeCategorias();
           unsubscribeMediosPago();
           unsubscribeGastos();
+          unsubscribeIngresos();
+          unsubscribeCategoriasIngreso();
+          unsubscribeBalances();
         }
       });
 
@@ -226,6 +274,43 @@ export const useStore = create<State>((set, get) => ({
     } catch (error) {
       console.error('Error al eliminar gasto:', error);
       set({ error: 'Error al eliminar gasto' });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  agregarIngreso: async (ingreso) => {
+    if (!auth.currentUser) return;
+    
+    set({ loading: true, error: null });
+    
+    try {
+      await addDoc(collection(db, 'ingresos'), {
+        ...ingreso,
+        userId: auth.currentUser.uid,
+        fecha: serverTimestamp(),
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error al agregar ingreso:', error);
+      set({ error: 'Error al agregar ingreso' });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  eliminarIngreso: async (id) => {
+    if (!auth.currentUser) return;
+    
+    set({ loading: true, error: null });
+    
+    try {
+      await deleteDoc(doc(db, 'ingresos', id));
+    } catch (error) {
+      console.error('Error al eliminar ingreso:', error);
+      set({ error: 'Error al eliminar ingreso' });
       throw error;
     } finally {
       set({ loading: false });
@@ -298,6 +383,90 @@ export const useStore = create<State>((set, get) => ({
     } catch (error) {
       console.error('Error al eliminar categoría:', error);
       set({ error: 'Error al eliminar categoría' });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  agregarCategoriaIngreso: async (categoria) => {
+    if (!auth.currentUser) return;
+    
+    set({ loading: true, error: null });
+    
+    try {
+      await addDoc(collection(db, 'categoriasIngreso'), {
+        ...categoria,
+        userId: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Error al agregar categoría de ingreso:', error);
+      set({ error: 'Error al agregar categoría de ingreso' });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  eliminarCategoriaIngreso: async (id) => {
+    if (!auth.currentUser) return;
+    
+    set({ loading: true, error: null });
+    
+    try {
+      await deleteDoc(doc(db, 'categoriasIngreso', id));
+    } catch (error) {
+      console.error('Error al eliminar categoría de ingreso:', error);
+      set({ error: 'Error al eliminar categoría de ingreso' });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  generarCierreBalance: async () => {
+    if (!auth.currentUser) return;
+    
+    set({ loading: true, error: null });
+    
+    try {
+      const { gastos, ingresos } = get();
+      
+      const gastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
+      const gastosVariables = gastos.filter(g => !g.esFijo).reduce((sum, g) => sum + g.monto, 0);
+      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
+      const saldoFinal = totalIngresos - (gastosFijos + gastosVariables);
+
+      // Crear nuevo balance
+      await addDoc(collection(db, 'balances'), {
+        userId: auth.currentUser.uid,
+        fecha: serverTimestamp(),
+        gastosFijos,
+        gastosVariables,
+        ingresos: totalIngresos,
+        saldoFinal,
+        createdAt: serverTimestamp()
+      });
+
+      // Limpiar gastos e ingresos
+      const batch = writeBatch(db);
+      
+      for (const gasto of gastos) {
+        if (!gasto.esFijo) { // Mantener gastos fijos
+          batch.delete(doc(db, 'gastos', gasto.id));
+        }
+      }
+      
+      for (const ingreso of ingresos) {
+        batch.delete(doc(db, 'ingresos', ingreso.id));
+      }
+      
+      await batch.commit();
+      
+    } catch (error) {
+      console.error('Error al generar cierre de balance:', error);
+      set({ error: 'Error al generar cierre de balance' });
       throw error;
     } finally {
       set({ loading: false });

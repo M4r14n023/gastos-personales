@@ -52,19 +52,20 @@ export const ListaGastos: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Medio de Pago</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuotas</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {gastos.map((gasto) => (
-                <tr key={gasto.id} className={gasto.esFijo ? 'bg-blue-50' : ''}>
+                <tr key={gasto.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {format(gasto.fecha instanceof Date ? gasto.fecha : new Date(gasto.fecha), 'dd/MM/yyyy', { locale: es })}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {gasto.descripcion}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${gasto.esFijo ? 'text-blue-600 font-semibold' : 'text-gray-500'}`}>
                     ${gasto.monto.toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -75,6 +76,9 @@ export const ListaGastos: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {gasto.cuotas > 1 ? `${gasto.cuotaActual}/${gasto.cuotas}` : '-'}
+                  </td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${gasto.esFijo ? 'text-blue-600 font-semibold' : 'text-gray-500'}`}>
+                    {gasto.esFijo ? 'Fijo' : 'Variable'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button

@@ -4,9 +4,11 @@ import { NuevoGasto } from './NuevoGasto';
 import { ListaGastos } from './ListaGastos';
 import { Configuracion } from './Configuracion';
 import { Resumen } from './Resumen';
+import { Presupuesto } from './Presupuesto';
+import { Balances } from './Balances';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, Settings, PlusCircle, List, LogOut } from 'lucide-react';
+import { LayoutGrid, Settings, PlusCircle, List, LogOut, Wallet, FileText } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -38,6 +40,8 @@ export const Dashboard: React.FC = () => {
     { id: 'dashboard', name: 'Dashboard', icon: LayoutGrid },
     { id: 'nuevo', name: 'Nuevo Gasto', icon: PlusCircle },
     { id: 'lista', name: 'Lista de Gastos', icon: List },
+    { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
+    { id: 'balances', name: 'Balances', icon: FileText },
     { id: 'config', name: 'Configuración', icon: Settings },
   ];
 
@@ -125,6 +129,8 @@ export const Dashboard: React.FC = () => {
           )}
           {activeTab === 'nuevo' && <NuevoGasto />}
           {activeTab === 'lista' && <ListaGastos />}
+          {activeTab === 'presupuesto' && <Presupuesto />}
+          {activeTab === 'balances' && <Balances />}
           {activeTab === 'config' && <Configuracion />}
         </main>
       </div>
