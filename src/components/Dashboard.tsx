@@ -46,7 +46,7 @@ export const Dashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -68,7 +68,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="sm:hidden">
             <select
@@ -120,7 +120,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <main>
+        <main className="flex-1">
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <Resumen />
@@ -134,6 +134,14 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'config' && <Configuracion />}
         </main>
       </div>
+
+      <footer className="bg-white shadow-md mt-auto">
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-gray-500">
+            © {new Date().getFullYear()} Gestión de Gastos. Desarrollado por Mariano Lumbreras
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
