@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { auth } from '../../config/firebase';
+import { auth, db } from '../../config/firebase'; // Asegúrate de exportar db desde tu archivo de configuración de Firebase
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore'; // Importa setDoc de Firestore
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { useStore } from '../../store/useStore';
@@ -15,8 +16,24 @@ export const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      // Crear el usuario
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid; // Obtén el UID del nuevo usuario
+
+      // Crea un documento para el nuevo usuario en Firestore
+      await setDoc(doc(db, 'users', userId), {
+        // Aquí puedes agregar datos iniciales si es necesario
+      });
+
+      // Crear subcolecciones vacías (opcional)
+      await setDoc(doc(db, 'users', userId, 'gastos', 'placeholder'), { placeholder: true });
+      await setDoc(doc(db, 'users', userId, 'categorias', 'placeholder'), { placeholder: true });
+      await setDoc(doc(db, 'users', userId, 'mediosPago', 'placeholder'), { placeholder: true });
+
+      // Inicializa los datos del usuario en el estado de tu aplicación
       await initializeUserData();
+      
+      // Redirige al usuario al dashboard
       navigate('/dashboard');
     } catch (err: any) {
       setError('Error al registrarse: ' + err.message);
