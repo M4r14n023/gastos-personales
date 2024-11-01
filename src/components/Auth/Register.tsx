@@ -30,7 +30,7 @@ export const Register: React.FC = () => {
       await setDoc(doc(db, 'users', userId, 'gastos', 'placeholder'), { placeholder: true });
       await setDoc(doc(db, 'users', userId, 'categorias', 'placeholder'), { placeholder: true });
       await setDoc(doc(db, 'users', userId, 'mediosPago', 'placeholder'), { placeholder: true });
-
+      
       // Inicializa los datos del usuario en el estado de tu aplicación
       await initializeUserData();
       
