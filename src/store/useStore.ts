@@ -20,6 +20,22 @@ const defaultCategoriasIngreso: Omit<CategoriaIngreso, 'id'>[] = [
   { nombre: 'Otros' }
 ];
 
+const defaultCategorias: Omit<Categoria, 'id'>[] = [
+  { nombre: 'Alimentación' },
+  { nombre: 'Transporte' },
+  { nombre: 'Servicios' },
+  { nombre: 'Entretenimiento' },
+  { nombre: 'Salud' },
+  { nombre: 'Educación' },
+  { nombre: 'Otros' }
+];
+
+const defaultMediosPago: Omit<MedioPago, 'id'>[] = [
+  { nombre: 'Efectivo', tipo: 'efectivo' },
+  { nombre: 'Tarjeta de Débito', tipo: 'debito' },
+  { nombre: 'Tarjeta de Crédito', tipo: 'credito' }
+];
+
 interface State {
   gastos: Gasto[];
   ingresos: Ingreso[];
@@ -60,7 +76,11 @@ export const useStore = create<State>((set, get) => ({
   setError: (error) => set({ error }),
 
   initializeUserData: async () => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
@@ -71,7 +91,7 @@ export const useStore = create<State>((set, get) => ({
       const categoriasIngresoRef = collection(db, 'categoriasIngreso');
       
       // Check if user already has data
-      const categoriasQuery = query(categoriasRef, where('userId', '==', auth.currentUser.uid));
+      const categoriasQuery = query(categoriasRef, where('userId', '==', user.uid));
       const categoriasSnapshot = await getDocs(categoriasQuery);
       
       if (categoriasSnapshot.empty) {
@@ -81,7 +101,7 @@ export const useStore = create<State>((set, get) => ({
           const docRef = doc(categoriasRef);
           batch.set(docRef, {
             ...categoria,
-            userId: auth.currentUser.uid,
+            userId: user.uid,
             createdAt: serverTimestamp()
           });
           nuevasCategorias.push({ ...categoria, id: docRef.id });
@@ -93,7 +113,7 @@ export const useStore = create<State>((set, get) => ({
           const docRef = doc(mediosPagoRef);
           batch.set(docRef, {
             ...medioPago,
-            userId: auth.currentUser.uid,
+            userId: user.uid,
             createdAt: serverTimestamp()
           });
           nuevosMediosPago.push({ ...medioPago, id: docRef.id });
@@ -105,7 +125,7 @@ export const useStore = create<State>((set, get) => ({
           const docRef = doc(categoriasIngresoRef);
           batch.set(docRef, {
             ...categoria,
-            userId: auth.currentUser.uid,
+            userId: user.uid,
             createdAt: serverTimestamp()
           });
           nuevasCategoriasIngreso.push({ ...categoria, id: docRef.id });
@@ -122,16 +142,20 @@ export const useStore = create<State>((set, get) => ({
       }
       
       await get().cargarGastos();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al inicializar datos:', error);
-      set({ error: 'Error al inicializar datos' });
+      set({ error: `Error al inicializar datos: ${error.message || 'Error desconocido'}` });
     } finally {
       set({ loading: false });
     }
   },
 
   cargarGastos: async () => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
@@ -145,29 +169,37 @@ export const useStore = create<State>((set, get) => ({
 
       // Set up real-time listeners
       const unsubscribeCategorias = onSnapshot(
-        query(categoriasRef, where('userId', '==', auth.currentUser.uid)),
+        query(categoriasRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const categorias = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as Categoria[];
           set({ categorias });
+        },
+        (error) => {
+          console.error('Error al cargar categorías:', error);
+          set({ error: `Error al cargar categorías: ${error.message}` });
         }
       );
 
       const unsubscribeMediosPago = onSnapshot(
-        query(mediosPagoRef, where('userId', '==', auth.currentUser.uid)),
+        query(mediosPagoRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const mediosPago = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as MedioPago[];
           set({ mediosPago });
+        },
+        (error) => {
+          console.error('Error al cargar medios de pago:', error);
+          set({ error: `Error al cargar medios de pago: ${error.message}` });
         }
       );
 
       const unsubscribeGastos = onSnapshot(
-        query(gastosRef, where('userId', '==', auth.currentUser.uid)),
+        query(gastosRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const gastos = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -178,11 +210,15 @@ export const useStore = create<State>((set, get) => ({
             };
           }) as Gasto[];
           set({ gastos });
+        },
+        (error) => {
+          console.error('Error al cargar gastos:', error);
+          set({ error: `Error al cargar gastos: ${error.message}` });
         }
       );
 
       const unsubscribeIngresos = onSnapshot(
-        query(ingresosRef, where('userId', '==', auth.currentUser.uid)),
+        query(ingresosRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const ingresos = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -193,22 +229,30 @@ export const useStore = create<State>((set, get) => ({
             };
           }) as Ingreso[];
           set({ ingresos });
+        },
+        (error) => {
+          console.error('Error al cargar ingresos:', error);
+          set({ error: `Error al cargar ingresos: ${error.message}` });
         }
       );
 
       const unsubscribeCategoriasIngreso = onSnapshot(
-        query(categoriasIngresoRef, where('userId', '==', auth.currentUser.uid)),
+        query(categoriasIngresoRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const categoriasIngreso = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as CategoriaIngreso[];
           set({ categoriasIngreso });
+        },
+        (error) => {
+          console.error('Error al cargar categorías de ingreso:', error);
+          set({ error: `Error al cargar categorías de ingreso: ${error.message}` });
         }
       );
 
       const unsubscribeBalances = onSnapshot(
-        query(balancesRef, where('userId', '==', auth.currentUser.uid)),
+        query(balancesRef, where('userId', '==', user.uid)),
         (snapshot) => {
           const balances = snapshot.docs.map(doc => {
             const data = doc.data();
@@ -219,6 +263,10 @@ export const useStore = create<State>((set, get) => ({
             };
           }) as Balance[];
           set({ balances });
+        },
+        (error) => {
+          console.error('Error al cargar balances:', error);
+          set({ error: `Error al cargar balances: ${error.message}` });
         }
       );
 
@@ -231,33 +279,46 @@ export const useStore = create<State>((set, get) => ({
           unsubscribeIngresos();
           unsubscribeCategoriasIngreso();
           unsubscribeBalances();
+          set({
+            gastos: [],
+            ingresos: [],
+            mediosPago: [],
+            categorias: [],
+            categoriasIngreso: [],
+            balances: [],
+            initialized: false
+          });
         }
       });
 
       set({ initialized: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al cargar datos:', error);
-      set({ error: 'Error al cargar datos' });
+      set({ error: `Error al cargar datos: ${error.message || 'Error desconocido'}` });
     } finally {
       set({ loading: false });
     }
   },
 
   agregarGasto: async (gasto) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await addDoc(collection(db, 'gastos'), {
         ...gasto,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         fecha: serverTimestamp(),
         createdAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al agregar gasto:', error);
-      set({ error: 'Error al agregar gasto' });
+      set({ error: `Error al agregar gasto: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -265,15 +326,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarGasto: async (id) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await deleteDoc(doc(db, 'gastos', id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar gasto:', error);
-      set({ error: 'Error al eliminar gasto' });
+      set({ error: `Error al eliminar gasto: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -281,20 +346,24 @@ export const useStore = create<State>((set, get) => ({
   },
 
   agregarIngreso: async (ingreso) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await addDoc(collection(db, 'ingresos'), {
         ...ingreso,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         fecha: serverTimestamp(),
         createdAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al agregar ingreso:', error);
-      set({ error: 'Error al agregar ingreso' });
+      set({ error: `Error al agregar ingreso: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -302,15 +371,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarIngreso: async (id) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await deleteDoc(doc(db, 'ingresos', id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar ingreso:', error);
-      set({ error: 'Error al eliminar ingreso' });
+      set({ error: `Error al eliminar ingreso: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -318,19 +391,23 @@ export const useStore = create<State>((set, get) => ({
   },
 
   agregarMedioPago: async (medioPago) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await addDoc(collection(db, 'mediosPago'), {
         ...medioPago,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         createdAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al agregar medio de pago:', error);
-      set({ error: 'Error al agregar medio de pago' });
+      set({ error: `Error al agregar medio de pago: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -338,15 +415,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarMedioPago: async (id) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await deleteDoc(doc(db, 'mediosPago', id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar medio de pago:', error);
-      set({ error: 'Error al eliminar medio de pago' });
+      set({ error: `Error al eliminar medio de pago: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -354,19 +435,23 @@ export const useStore = create<State>((set, get) => ({
   },
 
   agregarCategoria: async (categoria) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await addDoc(collection(db, 'categorias'), {
         ...categoria,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         createdAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al agregar categoría:', error);
-      set({ error: 'Error al agregar categoría' });
+      set({ error: `Error al agregar categoría: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -374,15 +459,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarCategoria: async (id) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await deleteDoc(doc(db, 'categorias', id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar categoría:', error);
-      set({ error: 'Error al eliminar categoría' });
+      set({ error: `Error al eliminar categoría: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -390,19 +479,23 @@ export const useStore = create<State>((set, get) => ({
   },
 
   agregarCategoriaIngreso: async (categoria) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await addDoc(collection(db, 'categoriasIngreso'), {
         ...categoria,
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         createdAt: serverTimestamp()
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al agregar categoría de ingreso:', error);
-      set({ error: 'Error al agregar categoría de ingreso' });
+      set({ error: `Error al agregar categoría de ingreso: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -410,15 +503,19 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarCategoriaIngreso: async (id) => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
     try {
       await deleteDoc(doc(db, 'categoriasIngreso', id));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al eliminar categoría de ingreso:', error);
-      set({ error: 'Error al eliminar categoría de ingreso' });
+      set({ error: `Error al eliminar categoría de ingreso: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -426,7 +523,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   generarCierreBalance: async () => {
-    if (!auth.currentUser) return;
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
     
     set({ loading: true, error: null });
     
@@ -440,7 +541,7 @@ export const useStore = create<State>((set, get) => ({
 
       // Crear nuevo balance
       await addDoc(collection(db, 'balances'), {
-        userId: auth.currentUser.uid,
+        userId: user.uid,
         fecha: serverTimestamp(),
         gastosFijos,
         gastosVariables,
@@ -464,9 +565,9 @@ export const useStore = create<State>((set, get) => ({
       
       await batch.commit();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al generar cierre de balance:', error);
-      set({ error: 'Error al generar cierre de balance' });
+      set({ error: `Error al generar cierre de balance: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });

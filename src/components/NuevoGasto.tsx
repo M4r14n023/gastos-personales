@@ -40,44 +40,44 @@ export const NuevoGasto: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800">Nuevo Gasto</h2>
+    <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Nuevo Gasto</h2>
       {error && (
-        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+        <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded">
           {error}
         </div>
       )}
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Descripción</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
           <input
             type="text"
             value={formData.descripcion}
             onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full form-input-enhanced rounded-md"
             required
             disabled={loading}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Monto</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Monto</label>
           <input
             type="number"
             step="0.01"
             min="0"
             value={formData.monto}
             onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full form-input-enhanced rounded-md"
             required
             disabled={loading}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Categoría</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
           <select
             value={formData.categoria}
             onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full form-input-enhanced rounded-md"
             required
             disabled={loading}
           >
@@ -90,11 +90,11 @@ export const NuevoGasto: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Medio de Pago</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Medio de Pago</label>
           <select
             value={formData.medioPago}
             onChange={(e) => setFormData({ ...formData, medioPago: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full form-input-enhanced rounded-md"
             required
             disabled={loading}
           >
@@ -107,13 +107,13 @@ export const NuevoGasto: React.FC = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Cuotas</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cuotas</label>
           <input
             type="number"
             min="1"
             value={formData.cuotas}
             onChange={(e) => setFormData({ ...formData, cuotas: e.target.value })}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="mt-1 block w-full form-input-enhanced rounded-md"
             disabled={loading}
           />
         </div>
@@ -122,10 +122,10 @@ export const NuevoGasto: React.FC = () => {
             type="checkbox"
             checked={formData.esFijo}
             onChange={(e) => setFormData({ ...formData, esFijo: e.target.checked })}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-400 dark:border-gray-600 rounded shadow-sm"
             disabled={loading}
           />
-          <label className="ml-2 block text-sm text-gray-700">Gasto Fijo</label>
+          <label className="ml-2 block text-sm text-gray-700 dark:text-gray-300">Gasto Fijo</label>
         </div>
         <button
           type="submit"

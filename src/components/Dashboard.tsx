@@ -6,10 +6,11 @@ import { Configuracion } from './Configuracion';
 import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
 import { Balances } from './Balances';
+import { ListaCreditos } from './Creditos/ListaCreditos';
 import { ThemeToggle } from './ThemeToggle';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, Settings, PlusCircle, List, LogOut, Wallet, FileText } from 'lucide-react';
+import { LayoutGrid, Settings, PlusCircle, List, LogOut, Wallet, FileText, CreditCard } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ export const Dashboard: React.FC = () => {
     { id: 'nuevo', name: 'Nuevo Gasto', icon: PlusCircle },
     { id: 'lista', name: 'Lista de Gastos', icon: List },
     { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
+    { id: 'creditos', name: 'Créditos', icon: CreditCard },
     { id: 'balances', name: 'Balances', icon: FileText },
     { id: 'config', name: 'Configuración', icon: Settings },
   ];
@@ -132,6 +134,7 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'nuevo' && <NuevoGasto />}
           {activeTab === 'lista' && <ListaGastos />}
           {activeTab === 'presupuesto' && <Presupuesto />}
+          {activeTab === 'creditos' && <ListaCreditos creditos={[]} onSave={async () => {}} onAdelantarCuotas={async () => {}} />}
           {activeTab === 'balances' && <Balances />}
           {activeTab === 'config' && <Configuracion />}
         </main>

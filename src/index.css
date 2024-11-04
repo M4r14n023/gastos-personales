@@ -1,3 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Estilos base para inputs */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  select,
+  textarea {
+    @apply border-gray-300 bg-white shadow-sm focus:border-blue-500 focus:ring-blue-500;
+    @apply dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:focus:border-blue-500;
+  }
+
+  /* Mejorar contraste solo en modo claro */
+  :root:not(.dark) {
+    .table-cell-enhanced {
+      @apply border-gray-300 bg-white shadow-sm;
+    }
+
+    .form-input-enhanced {
+      @apply border-gray-400 bg-white shadow-md;
+    }
+
+    /* Inputs y selects con mejor contraste en modo claro */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"],
+    select,
+    textarea {
+      @apply border-gray-400 shadow-md;
+    }
+  }
+
+  /* Mantener estilos originales en modo oscuro */
+  .dark {
+    .table-cell-enhanced {
+      @apply border-gray-600 bg-gray-700;
+    }
+
+    .form-input-enhanced {
+      @apply border-gray-600 bg-gray-700 text-white;
+    }
+  }
+}
