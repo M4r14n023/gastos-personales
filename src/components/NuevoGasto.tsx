@@ -15,26 +15,15 @@ export const NuevoGasto: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (esFijo) {
-        await agregarGasto({
-          descripcion: formData.descripcion,
-          monto: Number(formData.monto),
-          fecha: new Date(formData.fechaVencimiento),
-          esFijo: true,
-          estadoPago: 'pendiente',
-          montoPagado: 0,
-        });
-      } else {
-        await agregarGasto({
-          descripcion: formData.descripcion,
-          monto: Number(formData.monto),
-          fecha: new Date(),
-          esFijo: false,
-          estadoPago: 'pagado',
-          montoPagado: Number(formData.monto),
-          cuenta: formData.cuenta,
-        });
-      }
+      await agregarGasto({
+        descripcion: formData.descripcion,
+        monto: Number(formData.monto),
+        fecha: esFijo ? new Date(formData.fechaVencimiento) : new Date(),
+        esFijo,
+        estadoPago: esFijo ? 'pendiente' : 'pagado',
+        montoPagado: esFijo ? 0 : Number(formData.monto),
+        cuenta: formData.cuenta,
+      });
 
       setFormData({
         descripcion: '',
@@ -74,7 +63,7 @@ export const NuevoGasto: React.FC = () => {
             type="text"
             value={formData.descripcion}
             onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-            className="mt-1 block w-full form-input-enhanced rounded-md"
+            className="mt-1 block w-full form-input-enhanced rounded-md dark:bg-gray-700 dark:text-white"
             required
             disabled={loading}
           />
@@ -88,7 +77,7 @@ export const NuevoGasto: React.FC = () => {
             min="0"
             value={formData.monto}
             onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-            className="mt-1 block w-full form-input-enhanced rounded-md"
+            className="mt-1 block w-full form-input-enhanced rounded-md dark:bg-gray-700 dark:text-white"
             required
             disabled={loading}
           />
@@ -101,7 +90,7 @@ export const NuevoGasto: React.FC = () => {
               type="date"
               value={formData.fechaVencimiento}
               onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
-              className="mt-1 block w-full form-input-enhanced rounded-md"
+              className="mt-1 block w-full form-input-enhanced rounded-md dark:bg-gray-700 dark:text-white"
               required
               disabled={loading}
             />
@@ -112,24 +101,33 @@ export const NuevoGasto: React.FC = () => {
             <select
               value={formData.cuenta}
               onChange={(e) => setFormData({ ...formData, cuenta: e.target.value })}
-              className="mt-1 block w-full form-input-enhanced rounded-md"
+              className="mt-1 block w-full form-input-enhanced rounded-md dark:bg-gray-700 dark:text-white"
               required
               disabled={loading}
             >
               <option value="">Seleccionar cuenta</option>
-              {categoriasIngreso.map((cuenta) => (
-                <option key={cuenta.id} value={cuenta.id}>
-                  {cuenta.nombre} (Saldo: ${(cuenta.saldo || 0).toFixed(2)})
-                </option>
-              ))}
+              {categoriasIngreso.map((cuenta) => {
+                const saldoInsuficiente = cuenta.saldo < Number(formData.monto);
+                return (
+                  <option 
+                    key={cuenta.id} 
+                    value={cuenta.id}
+                    disabled={saldoInsuficiente}
+                    className={saldoInsuficiente ? 'text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}
+                  >
+                    {cuenta.nombre} (Saldo: ${(cuenta.saldo || 0).toFixed(2)})
+                    {saldoInsuficiente ? ' - Saldo insuficiente' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
         )}
 
         <button
           type="submit"
-          className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          disabled={loading}
+          className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 dark:focus:ring-offset-gray-800"
+          disabled={loading || (!esFijo && Number(formData.monto) > 0 && formData.cuenta && categoriasIngreso.find(c => c.id === formData.cuenta)?.saldo < Number(formData.monto))}
         >
           <PlusCircle className="mr-2 h-5 w-5" />
           {loading ? 'Agregando...' : 'Agregar Gasto'}

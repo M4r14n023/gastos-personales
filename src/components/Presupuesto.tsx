@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2 } from 'lucide-react';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface TransferenciaModalProps {
@@ -9,6 +9,77 @@ interface TransferenciaModalProps {
   onClose: () => void;
   onConfirm: (origen: string, destino: string, monto: number) => Promise<void>;
 }
+
+interface EditarCuentaModalProps {
+  cuenta: any;
+  onClose: () => void;
+  onConfirm: (id: string, nuevoNombre: string) => Promise<void>;
+}
+
+const EditarCuentaModal: React.FC<EditarCuentaModalProps> = ({ cuenta, onClose, onConfirm }) => {
+  const [nuevoNombre, setNuevoNombre] = useState(cuenta.nombre);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoNombre.trim()) {
+      setError('El nombre no puede estar vacío');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onConfirm(cuenta.id, nuevoNombre.trim());
+      onClose();
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-lg font-medium mb-4">Editar Cuenta</h3>
+        {error && (
+          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Nombre de la Cuenta</label>
+            <input
+              type="text"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 const TransferenciaModal: React.FC<TransferenciaModalProps> = ({ categoriasIngreso, onClose, onConfirm }) => {
   const [origen, setOrigen] = useState('');
@@ -127,6 +198,7 @@ export const Presupuesto: React.FC = () => {
     agregarIngreso, 
     eliminarIngreso,
     agregarCategoriaIngreso,
+    editarCategoriaIngreso,
     transferirEntreCuentas,
     generarCierreBalance,
     loading,
@@ -136,13 +208,13 @@ export const Presupuesto: React.FC = () => {
   const [nuevoIngreso, setNuevoIngreso] = useState({
     descripcion: '',
     monto: '',
-    categoria: '',
     cuenta: ''
   });
 
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
   const [mostrarTransferencia, setMostrarTransferencia] = useState(false);
+  const [cuentaEditar, setCuentaEditar] = useState<any>(null);
 
   const totalIngresos = ingresos.reduce((sum, ingreso) => sum + ingreso.monto, 0);
   const totalGastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
@@ -151,16 +223,15 @@ export const Presupuesto: React.FC = () => {
 
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (nuevoIngreso.descripcion && nuevoIngreso.monto && nuevoIngreso.categoria && nuevoIngreso.cuenta) {
+    if (nuevoIngreso.descripcion && nuevoIngreso.monto && nuevoIngreso.cuenta) {
       try {
         await agregarIngreso({
           descripcion: nuevoIngreso.descripcion,
           monto: Number(nuevoIngreso.monto),
-          categoria: nuevoIngreso.categoria,
           cuenta: nuevoIngreso.cuenta,
           fecha: new Date()
         });
-        setNuevoIngreso({ descripcion: '', monto: '', categoria: '', cuenta: '' });
+        setNuevoIngreso({ descripcion: '', monto: '', cuenta: '' });
       } catch (error) {
         // Error is handled by the store
       }
@@ -196,6 +267,27 @@ export const Presupuesto: React.FC = () => {
     } catch (error) {
       // Error is handled by the store
     }
+  };
+
+  const handleEditarCuenta = async (id: string, nuevoNombre: string) => {
+    try {
+      await editarCategoriaIngreso(id, nuevoNombre);
+    } catch (error) {
+      // Error is handled by the store
+    }
+  };
+
+  const formatDate = (date: Date | string | number | undefined) => {
+    if (!date) return 'Fecha no disponible';
+    try {
+      const parsedDate = date instanceof Date ? date : new Date(date);
+      if (isValid(parsedDate)) {
+        return format(parsedDate, 'dd/MM/yyyy', { locale: es });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+    }
+    return 'Fecha inválida';
   };
 
   return (
@@ -243,7 +335,15 @@ export const Presupuesto: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {categoriasIngreso.map((cuenta) => (
             <div key={cuenta.id} className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-800">{cuenta.nombre}</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-800">{cuenta.nombre}</h3>
+                <button
+                  onClick={() => setCuentaEditar(cuenta)}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+              </div>
               <p className="text-xl font-bold text-green-600">${cuenta.saldo.toFixed(2)}</p>
             </div>
           ))}
@@ -311,23 +411,6 @@ export const Presupuesto: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Categoría</label>
-            <select
-              value={nuevoIngreso.categoria}
-              onChange={(e) => setNuevoIngreso({ ...nuevoIngreso, categoria: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              required
-              disabled={loading}
-            >
-              <option value="">Seleccionar categoría</option>
-              {categoriasIngreso.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700">Cuenta</label>
             <select
               value={nuevoIngreso.cuenta}
@@ -378,7 +461,6 @@ export const Presupuesto: React.FC = () => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -388,13 +470,10 @@ export const Presupuesto: React.FC = () => {
                 {ingresos.map((ingreso) => (
                   <tr key={ingreso.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(ingreso.fecha instanceof Date ? ingreso.fecha : new Date(ingreso.fecha), 'dd/MM/yyyy', { locale: es })}
+                      {formatDate(ingreso.fecha)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {ingreso.descripcion}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {categoriasIngreso.find(cat => cat.id === ingreso.categoria)?.nombre}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {categoriasIngreso.find(cat => cat.id === ingreso.cuenta)?.nombre}
@@ -424,6 +503,14 @@ export const Presupuesto: React.FC = () => {
           categoriasIngreso={categoriasIngreso}
           onClose={() => setMostrarTransferencia(false)}
           onConfirm={handleTransferencia}
+        />
+      )}
+
+      {cuentaEditar && (
+        <EditarCuentaModal
+          cuenta={cuentaEditar}
+          onClose={() => setCuentaEditar(null)}
+          onConfirm={handleEditarCuenta}
         />
       )}
     </div>

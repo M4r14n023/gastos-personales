@@ -2,16 +2,15 @@ import React, { useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { NuevoGasto } from './NuevoGasto';
 import { ListaGastos } from './ListaGastos';
-import { Configuracion } from './Configuracion';
 import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
 import { Balances } from './Balances';
 import { ListaCreditos } from './Creditos/ListaCreditos';
 import { ThemeToggle } from './ThemeToggle';
-import { OfflineIndicator } from './OfflineIndicator';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, Settings, PlusCircle, List, LogOut, Wallet, FileText, CreditCard } from 'lucide-react';
+import { LayoutGrid, PlusCircle, List, LogOut, Wallet, FileText, CreditCard } from 'lucide-react';
+import { OfflineIndicator } from './OfflineIndicator';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -46,7 +45,6 @@ export const Dashboard: React.FC = () => {
     { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
     { id: 'creditos', name: 'Créditos', icon: CreditCard },
     { id: 'balances', name: 'Balances', icon: FileText },
-    { id: 'config', name: 'Configuración', icon: Settings },
   ];
 
   return (
@@ -137,7 +135,6 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'presupuesto' && <Presupuesto />}
           {activeTab === 'creditos' && <ListaCreditos creditos={[]} onSave={async () => {}} onAdelantarCuotas={async () => {}} />}
           {activeTab === 'balances' && <Balances />}
-          {activeTab === 'config' && <Configuracion />}
         </main>
       </div>
 
