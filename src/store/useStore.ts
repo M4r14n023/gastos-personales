@@ -1,304 +1,54 @@
 import { create } from 'zustand';
-import { Gasto, MedioPago, Categoria, Ingreso, CategoriaIngreso, Balance } from '../types';
-import { db, auth } from '../config/firebase';
-import { 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  getDocs, 
-  query, 
-  where,
-  serverTimestamp,
-  writeBatch,
-  onSnapshot
-} from 'firebase/firestore';
-
-const defaultCategoriasIngreso: Omit<CategoriaIngreso, 'id'>[] = [
-  { nombre: 'Sueldo' },
-  { nombre: 'Ingreso único' },
-  { nombre: 'Otros' }
-];
-
-const defaultCategorias: Omit<Categoria, 'id'>[] = [
-  { nombre: 'Alimentación' },
-  { nombre: 'Transporte' },
-  { nombre: 'Servicios' },
-  { nombre: 'Entretenimiento' },
-  { nombre: 'Salud' },
-  { nombre: 'Educación' },
-  { nombre: 'Otros' }
-];
-
-const defaultMediosPago: Omit<MedioPago, 'id'>[] = [
-  { nombre: 'Efectivo', tipo: 'efectivo' },
-  { nombre: 'Tarjeta de Débito', tipo: 'debito' },
-  { nombre: 'Tarjeta de Crédito', tipo: 'credito' }
-];
+import { auth, db } from '../config/firebase';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { CategoriaIngreso, Gasto } from '../types';
 
 interface State {
   gastos: Gasto[];
-  ingresos: Ingreso[];
-  mediosPago: MedioPago[];
-  categorias: Categoria[];
+  categorias: { id: string; nombre: string; }[];
+  mediosPago: { id: string; nombre: string; tipo: string; }[];
   categoriasIngreso: CategoriaIngreso[];
-  balances: Balance[];
-  initialized: boolean;
+  ingresos: any[];
   loading: boolean;
   error: string | null;
+  initialized: boolean;
+  balances: any[];
+
+  agregarGasto: (gasto: {
+    descripcion: string;
+    monto: number;
+    fecha: Date;
+    esFijo: boolean;
+    estadoPago: 'pendiente' | 'pagado';
+    montoPagado: number;
+    cuenta?: string;
+  }) => Promise<void>;
+
   cargarGastos: () => Promise<void>;
-  initializeUserData: () => Promise<void>;
-  agregarGasto: (gasto: Omit<Gasto, 'id'>) => Promise<void>;
   eliminarGasto: (id: string) => Promise<void>;
-  agregarIngreso: (ingreso: Omit<Ingreso, 'id'>) => Promise<void>;
-  eliminarIngreso: (id: string) => Promise<void>;
-  agregarMedioPago: (medioPago: Omit<MedioPago, 'id'>) => Promise<void>;
-  eliminarMedioPago: (id: string) => Promise<void>;
-  agregarCategoria: (categoria: Omit<Categoria, 'id'>) => Promise<void>;
+  registrarPago: (id: string, monto: number, cuenta: string) => Promise<void>;
+  agregarCategoria: (categoria: { nombre: string }) => Promise<void>;
   eliminarCategoria: (id: string) => Promise<void>;
-  agregarCategoriaIngreso: (categoria: Omit<CategoriaIngreso, 'id'>) => Promise<void>;
-  eliminarCategoriaIngreso: (id: string) => Promise<void>;
+  agregarMedioPago: (medioPago: { nombre: string; tipo: string }) => Promise<void>;
+  eliminarMedioPago: (id: string) => Promise<void>;
+  agregarCategoriaIngreso: (categoria: { nombre: string; saldo: number }) => Promise<void>;
+  agregarIngreso: (ingreso: any) => Promise<void>;
+  eliminarIngreso: (id: string) => Promise<void>;
+  transferirEntreCuentas: (origen: string, destino: string, monto: number) => Promise<void>;
   generarCierreBalance: () => Promise<void>;
-  setError: (error: string | null) => void;
+  initializeUserData: () => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
   gastos: [],
-  ingresos: [],
-  mediosPago: [],
   categorias: [],
+  mediosPago: [],
   categoriasIngreso: [],
+  ingresos: [],
   balances: [],
-  initialized: false,
   loading: false,
   error: null,
-
-  setError: (error) => set({ error }),
-
-  initializeUserData: async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      const batch = writeBatch(db);
-      const categoriasRef = collection(db, 'categorias');
-      const mediosPagoRef = collection(db, 'mediosPago');
-      const categoriasIngresoRef = collection(db, 'categoriasIngreso');
-      
-      // Check if user already has data
-      const categoriasQuery = query(categoriasRef, where('userId', '==', user.uid));
-      const categoriasSnapshot = await getDocs(categoriasQuery);
-      
-      if (categoriasSnapshot.empty) {
-        // Initialize default categories
-        const nuevasCategorias: Categoria[] = [];
-        for (const categoria of defaultCategorias) {
-          const docRef = doc(categoriasRef);
-          batch.set(docRef, {
-            ...categoria,
-            userId: user.uid,
-            createdAt: serverTimestamp()
-          });
-          nuevasCategorias.push({ ...categoria, id: docRef.id });
-        }
-        
-        // Initialize default payment methods
-        const nuevosMediosPago: MedioPago[] = [];
-        for (const medioPago of defaultMediosPago) {
-          const docRef = doc(mediosPagoRef);
-          batch.set(docRef, {
-            ...medioPago,
-            userId: user.uid,
-            createdAt: serverTimestamp()
-          });
-          nuevosMediosPago.push({ ...medioPago, id: docRef.id });
-        }
-
-        // Initialize default income categories
-        const nuevasCategoriasIngreso: CategoriaIngreso[] = [];
-        for (const categoria of defaultCategoriasIngreso) {
-          const docRef = doc(categoriasIngresoRef);
-          batch.set(docRef, {
-            ...categoria,
-            userId: user.uid,
-            createdAt: serverTimestamp()
-          });
-          nuevasCategoriasIngreso.push({ ...categoria, id: docRef.id });
-        }
-        
-        await batch.commit();
-        
-        set({
-          categorias: nuevasCategorias,
-          mediosPago: nuevosMediosPago,
-          categoriasIngreso: nuevasCategoriasIngreso,
-          initialized: true
-        });
-      }
-      
-      await get().cargarGastos();
-    } catch (error: any) {
-      console.error('Error al inicializar datos:', error);
-      set({ error: `Error al inicializar datos: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  cargarGastos: async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      const categoriasRef = collection(db, 'categorias');
-      const mediosPagoRef = collection(db, 'mediosPago');
-      const gastosRef = collection(db, 'gastos');
-      const ingresosRef = collection(db, 'ingresos');
-      const categoriasIngresoRef = collection(db, 'categoriasIngreso');
-      const balancesRef = collection(db, 'balances');
-
-      // Set up real-time listeners
-      const unsubscribeCategorias = onSnapshot(
-        query(categoriasRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const categorias = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Categoria[];
-          set({ categorias });
-        },
-        (error) => {
-          console.error('Error al cargar categorías:', error);
-          set({ error: `Error al cargar categorías: ${error.message}` });
-        }
-      );
-
-      const unsubscribeMediosPago = onSnapshot(
-        query(mediosPagoRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const mediosPago = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as MedioPago[];
-          set({ mediosPago });
-        },
-        (error) => {
-          console.error('Error al cargar medios de pago:', error);
-          set({ error: `Error al cargar medios de pago: ${error.message}` });
-        }
-      );
-
-      const unsubscribeGastos = onSnapshot(
-        query(gastosRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const gastos = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              fecha: data.fecha?.toDate() || new Date(),
-            };
-          }) as Gasto[];
-          set({ gastos });
-        },
-        (error) => {
-          console.error('Error al cargar gastos:', error);
-          set({ error: `Error al cargar gastos: ${error.message}` });
-        }
-      );
-
-      const unsubscribeIngresos = onSnapshot(
-        query(ingresosRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const ingresos = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              fecha: data.fecha?.toDate() || new Date(),
-            };
-          }) as Ingreso[];
-          set({ ingresos });
-        },
-        (error) => {
-          console.error('Error al cargar ingresos:', error);
-          set({ error: `Error al cargar ingresos: ${error.message}` });
-        }
-      );
-
-      const unsubscribeCategoriasIngreso = onSnapshot(
-        query(categoriasIngresoRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const categoriasIngreso = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as CategoriaIngreso[];
-          set({ categoriasIngreso });
-        },
-        (error) => {
-          console.error('Error al cargar categorías de ingreso:', error);
-          set({ error: `Error al cargar categorías de ingreso: ${error.message}` });
-        }
-      );
-
-      const unsubscribeBalances = onSnapshot(
-        query(balancesRef, where('userId', '==', user.uid)),
-        (snapshot) => {
-          const balances = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              ...data,
-              fecha: data.fecha?.toDate() || new Date(),
-            };
-          }) as Balance[];
-          set({ balances });
-        },
-        (error) => {
-          console.error('Error al cargar balances:', error);
-          set({ error: `Error al cargar balances: ${error.message}` });
-        }
-      );
-
-      // Clean up listeners on auth state change
-      auth.onAuthStateChanged((user) => {
-        if (!user) {
-          unsubscribeCategorias();
-          unsubscribeMediosPago();
-          unsubscribeGastos();
-          unsubscribeIngresos();
-          unsubscribeCategoriasIngreso();
-          unsubscribeBalances();
-          set({
-            gastos: [],
-            ingresos: [],
-            mediosPago: [],
-            categorias: [],
-            categoriasIngreso: [],
-            balances: [],
-            initialized: false
-          });
-        }
-      });
-
-      set({ initialized: true });
-    } catch (error: any) {
-      console.error('Error al cargar datos:', error);
-      set({ error: `Error al cargar datos: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
+  initialized: false,
 
   agregarGasto: async (gasto) => {
     const user = auth.currentUser;
@@ -310,12 +60,34 @@ export const useStore = create<State>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await addDoc(collection(db, 'gastos'), {
+      const batch = writeBatch(db);
+      
+      const gastoRef = doc(collection(db, 'gastos'));
+      batch.set(gastoRef, {
         ...gasto,
         userId: user.uid,
-        fecha: serverTimestamp(),
         createdAt: serverTimestamp()
       });
+
+      if (!gasto.esFijo && gasto.cuenta) {
+        const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
+        const cuentaDoc = await getDocs(query(collection(db, 'categoriasIngreso'), where('id', '==', gasto.cuenta)));
+        
+        if (!cuentaDoc.empty) {
+          const cuenta = cuentaDoc.docs[0].data() as CategoriaIngreso;
+          if (cuenta.saldo < gasto.monto) {
+            throw new Error('Saldo insuficiente en la cuenta');
+          }
+          
+          batch.update(cuentaRef, {
+            saldo: cuenta.saldo - gasto.monto,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+      
+      await batch.commit();
+      await get().cargarGastos();
     } catch (error: any) {
       console.error('Error al agregar gasto:', error);
       set({ error: `Error al agregar gasto: ${error.message || 'Error desconocido'}` });
@@ -325,42 +97,182 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  eliminarGasto: async (id) => {
+  cargarGastos: async () => {
     const user = auth.currentUser;
     if (!user) {
       set({ error: 'Usuario no autenticado' });
       return;
     }
-    
+
     set({ loading: true, error: null });
-    
+
     try {
-      await deleteDoc(doc(db, 'gastos', id));
+      const gastosSnapshot = await getDocs(
+        query(collection(db, 'gastos'), where('userId', '==', user.uid))
+      );
+      
+      const gastos = gastosSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Gasto[];
+
+      set({ gastos });
+    } catch (error: any) {
+      console.error('Error al cargar gastos:', error);
+      set({ error: `Error al cargar gastos: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  eliminarGasto: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await doc(db, 'gastos', id).delete();
+      await get().cargarGastos();
     } catch (error: any) {
       console.error('Error al eliminar gasto:', error);
       set({ error: `Error al eliminar gasto: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  registrarPago: async (id, monto, cuenta) => {
+    set({ loading: true, error: null });
+    try {
+      const batch = writeBatch(db);
+      
+      const gastoRef = doc(db, 'gastos', id);
+      const gastoDoc = await gastoRef.get();
+      const gasto = gastoDoc.data() as Gasto;
+      
+      const nuevoMontoPagado = gasto.montoPagado + monto;
+      const nuevoEstado = nuevoMontoPagado >= gasto.monto ? 'pagado' : 'parcial';
+      
+      batch.update(gastoRef, {
+        montoPagado: nuevoMontoPagado,
+        estadoPago: nuevoEstado,
+        updatedAt: serverTimestamp()
+      });
+      
+      const cuentaRef = doc(db, 'categoriasIngreso', cuenta);
+      const cuentaDoc = await cuentaRef.get();
+      const cuentaData = cuentaDoc.data() as CategoriaIngreso;
+      
+      if (cuentaData.saldo < monto) {
+        throw new Error('Saldo insuficiente en la cuenta');
+      }
+      
+      batch.update(cuentaRef, {
+        saldo: cuentaData.saldo - monto,
+        updatedAt: serverTimestamp()
+      });
+      
+      await batch.commit();
+      await get().cargarGastos();
+    } catch (error: any) {
+      console.error('Error al registrar pago:', error);
+      set({ error: `Error al registrar pago: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
     }
   },
 
-  agregarIngreso: async (ingreso) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
+  agregarCategoria: async (categoria) => {
     set({ loading: true, error: null });
-    
     try {
-      await addDoc(collection(db, 'ingresos'), {
-        ...ingreso,
-        userId: user.uid,
-        fecha: serverTimestamp(),
+      const categoriaRef = doc(collection(db, 'categorias'));
+      await categoriaRef.set({
+        ...categoria,
         createdAt: serverTimestamp()
       });
+    } catch (error: any) {
+      console.error('Error al agregar categoría:', error);
+      set({ error: `Error al agregar categoría: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  eliminarCategoria: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await doc(db, 'categorias', id).delete();
+    } catch (error: any) {
+      console.error('Error al eliminar categoría:', error);
+      set({ error: `Error al eliminar categoría: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  agregarMedioPago: async (medioPago) => {
+    set({ loading: true, error: null });
+    try {
+      const medioPagoRef = doc(collection(db, 'mediosPago'));
+      await medioPagoRef.set({
+        ...medioPago,
+        createdAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Error al agregar medio de pago:', error);
+      set({ error: `Error al agregar medio de pago: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  eliminarMedioPago: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await doc(db, 'mediosPago', id).delete();
+    } catch (error: any) {
+      console.error('Error al eliminar medio de pago:', error);
+      set({ error: `Error al eliminar medio de pago: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  agregarCategoriaIngreso: async (categoria) => {
+    set({ loading: true, error: null });
+    try {
+      const categoriaRef = doc(collection(db, 'categoriasIngreso'));
+      await categoriaRef.set({
+        ...categoria,
+        createdAt: serverTimestamp()
+      });
+    } catch (error: any) {
+      console.error('Error al agregar categoría de ingreso:', error);
+      set({ error: `Error al agregar categoría de ingreso: ${error.message || 'Error desconocido'}` });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  agregarIngreso: async (ingreso) => {
+    set({ loading: true, error: null });
+    try {
+      const batch = writeBatch(db);
+      
+      const ingresoRef = doc(collection(db, 'ingresos'));
+      batch.set(ingresoRef, {
+        ...ingreso,
+        createdAt: serverTimestamp()
+      });
+      
+      const cuentaRef = doc(db, 'categoriasIngreso', ingreso.cuenta);
+      const cuentaDoc = await cuentaRef.get();
+      const cuenta = cuentaDoc.data() as CategoriaIngreso;
+      
+      batch.update(cuentaRef, {
+        saldo: cuenta.saldo + ingreso.monto,
+        updatedAt: serverTimestamp()
+      });
+      
+      await batch.commit();
     } catch (error: any) {
       console.error('Error al agregar ingreso:', error);
       set({ error: `Error al agregar ingreso: ${error.message || 'Error desconocido'}` });
@@ -371,151 +283,56 @@ export const useStore = create<State>((set, get) => ({
   },
 
   eliminarIngreso: async (id) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
     set({ loading: true, error: null });
-    
     try {
-      await deleteDoc(doc(db, 'ingresos', id));
+      await doc(db, 'ingresos', id).delete();
     } catch (error: any) {
       console.error('Error al eliminar ingreso:', error);
       set({ error: `Error al eliminar ingreso: ${error.message || 'Error desconocido'}` });
-      throw error;
     } finally {
       set({ loading: false });
     }
   },
 
-  agregarMedioPago: async (medioPago) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
+  transferirEntreCuentas: async (origen, destino, monto) => {
     set({ loading: true, error: null });
-    
     try {
-      await addDoc(collection(db, 'mediosPago'), {
-        ...medioPago,
-        userId: user.uid,
-        createdAt: serverTimestamp()
+      const batch = writeBatch(db);
+      
+      const origenRef = doc(db, 'categoriasIngreso', origen);
+      const origenDoc = await origenRef.get();
+      const origenData = origenDoc.data() as CategoriaIngreso;
+      
+      if (origenData.saldo < monto) {
+        throw new Error('Saldo insuficiente en la cuenta origen');
+      }
+      
+      const destinoRef = doc(db, 'categoriasIngreso', destino);
+      const destinoDoc = await destinoRef.get();
+      const destinoData = destinoDoc.data() as CategoriaIngreso;
+      
+      batch.update(origenRef, {
+        saldo: origenData.saldo - monto,
+        updatedAt: serverTimestamp()
       });
-    } catch (error: any) {
-      console.error('Error al agregar medio de pago:', error);
-      set({ error: `Error al agregar medio de pago: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  eliminarMedioPago: async (id) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      await deleteDoc(doc(db, 'mediosPago', id));
-    } catch (error: any) {
-      console.error('Error al eliminar medio de pago:', error);
-      set({ error: `Error al eliminar medio de pago: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  agregarCategoria: async (categoria) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      await addDoc(collection(db, 'categorias'), {
-        ...categoria,
-        userId: user.uid,
-        createdAt: serverTimestamp()
+      
+      batch.update(destinoRef, {
+        saldo: destinoData.saldo + monto,
+        updatedAt: serverTimestamp()
       });
-    } catch (error: any) {
-      console.error('Error al agregar categoría:', error);
-      set({ error: `Error al agregar categoría: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  eliminarCategoria: async (id) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      await deleteDoc(doc(db, 'categorias', id));
-    } catch (error: any) {
-      console.error('Error al eliminar categoría:', error);
-      set({ error: `Error al eliminar categoría: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  agregarCategoriaIngreso: async (categoria) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      await addDoc(collection(db, 'categoriasIngreso'), {
-        ...categoria,
-        userId: user.uid,
-        createdAt: serverTimestamp()
+      
+      const transferenciaRef = doc(collection(db, 'transferencias'));
+      batch.set(transferenciaRef, {
+        origen,
+        destino,
+        monto,
+        fecha: serverTimestamp()
       });
+      
+      await batch.commit();
     } catch (error: any) {
-      console.error('Error al agregar categoría de ingreso:', error);
-      set({ error: `Error al agregar categoría de ingreso: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  eliminarCategoriaIngreso: async (id) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      await deleteDoc(doc(db, 'categoriasIngreso', id));
-    } catch (error: any) {
-      console.error('Error al eliminar categoría de ingreso:', error);
-      set({ error: `Error al eliminar categoría de ingreso: ${error.message || 'Error desconocido'}` });
+      console.error('Error al transferir entre cuentas:', error);
+      set({ error: `Error al transferir entre cuentas: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
@@ -523,48 +340,36 @@ export const useStore = create<State>((set, get) => ({
   },
 
   generarCierreBalance: async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
     set({ loading: true, error: null });
-    
     try {
-      const { gastos, ingresos } = get();
-      
-      const gastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
-      const gastosVariables = gastos.filter(g => !g.esFijo).reduce((sum, g) => sum + g.monto, 0);
-      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
-      const saldoFinal = totalIngresos - (gastosFijos + gastosVariables);
-
-      // Crear nuevo balance
-      await addDoc(collection(db, 'balances'), {
-        userId: user.uid,
-        fecha: serverTimestamp(),
-        gastosFijos,
-        gastosVariables,
-        ingresos: totalIngresos,
-        saldoFinal,
-        createdAt: serverTimestamp()
-      });
-
-      // Limpiar gastos e ingresos
       const batch = writeBatch(db);
       
-      for (const gasto of gastos) {
-        if (!gasto.esFijo) { // Mantener gastos fijos
-          batch.delete(doc(db, 'gastos', gasto.id));
-        }
-      }
+      const gastosVariables = get().gastos.filter(g => !g.esFijo);
+      const ingresos = get().ingresos;
       
-      for (const ingreso of ingresos) {
+      const totalGastosFijos = get().gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
+      const totalGastosVariables = gastosVariables.reduce((sum, g) => sum + g.monto, 0);
+      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
+      
+      const balanceRef = doc(collection(db, 'balances'));
+      batch.set(balanceRef, {
+        fecha: new Date(),
+        gastosFijos: totalGastosFijos,
+        gastosVariables: totalGastosVariables,
+        ingresos: totalIngresos,
+        saldoFinal: totalIngresos - (totalGastosFijos + totalGastosVariables)
+      });
+      
+      gastosVariables.forEach(gasto => {
+        batch.delete(doc(db, 'gastos', gasto.id));
+      });
+      
+      ingresos.forEach(ingreso => {
         batch.delete(doc(db, 'ingresos', ingreso.id));
-      }
+      });
       
       await batch.commit();
-      
+      await get().cargarGastos();
     } catch (error: any) {
       console.error('Error al generar cierre de balance:', error);
       set({ error: `Error al generar cierre de balance: ${error.message || 'Error desconocido'}` });
@@ -573,4 +378,66 @@ export const useStore = create<State>((set, get) => ({
       set({ loading: false });
     }
   },
+
+  initializeUserData: async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
+
+    set({ loading: true, error: null });
+
+    try {
+      const batch = writeBatch(db);
+
+      const defaultCategories = ['Alimentación', 'Transporte', 'Servicios', 'Entretenimiento'];
+      for (const category of defaultCategories) {
+        const categoryRef = doc(collection(db, 'categorias'));
+        batch.set(categoryRef, {
+          nombre: category,
+          userId: user.uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      const defaultPaymentMethods = [
+        { nombre: 'Efectivo', tipo: 'efectivo' },
+        { nombre: 'Tarjeta de Débito', tipo: 'debito' },
+        { nombre: 'Tarjeta de Crédito', tipo: 'credito' }
+      ];
+
+      for (const method of defaultPaymentMethods) {
+        const methodRef = doc(collection(db, 'mediosPago'));
+        batch.set(methodRef, {
+          ...method,
+          userId: user.uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      const defaultIncomeCategories = [
+        { nombre: 'Cuenta Principal', saldo: 0 },
+        { nombre: 'Ahorros', saldo: 0 }
+      ];
+
+      for (const category of defaultIncomeCategories) {
+        const categoryRef = doc(collection(db, 'categoriasIngreso'));
+        batch.set(categoryRef, {
+          ...category,
+          userId: user.uid,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      await batch.commit();
+      set({ initialized: true });
+    } catch (error: any) {
+      console.error('Error al inicializar datos:', error);
+      set({ error: `Error al inicializar datos: ${error.message || 'Error desconocido'}` });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  }
 }));

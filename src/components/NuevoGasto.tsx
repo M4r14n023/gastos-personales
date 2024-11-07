@@ -3,36 +3,44 @@ import { useStore } from '../store/useStore';
 import { PlusCircle } from 'lucide-react';
 
 export const NuevoGasto: React.FC = () => {
-  const { mediosPago, categorias, agregarGasto, loading, error } = useStore();
+  const { categoriasIngreso = [], agregarGasto, loading, error } = useStore();
+  const [esFijo, setEsFijo] = useState(false);
   const [formData, setFormData] = useState({
     descripcion: '',
     monto: '',
-    categoria: '',
-    medioPago: '',
-    cuotas: '1',
-    esFijo: false,
+    fechaVencimiento: '',
+    cuenta: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await agregarGasto({
-        descripcion: formData.descripcion,
-        monto: Number(formData.monto),
-        fecha: new Date(),
-        categoria: formData.categoria,
-        medioPago: formData.medioPago,
-        cuotas: Number(formData.cuotas),
-        cuotaActual: 1,
-        esFijo: formData.esFijo,
-      });
+      if (esFijo) {
+        await agregarGasto({
+          descripcion: formData.descripcion,
+          monto: Number(formData.monto),
+          fecha: new Date(formData.fechaVencimiento),
+          esFijo: true,
+          estadoPago: 'pendiente',
+          montoPagado: 0,
+        });
+      } else {
+        await agregarGasto({
+          descripcion: formData.descripcion,
+          monto: Number(formData.monto),
+          fecha: new Date(),
+          esFijo: false,
+          estadoPago: 'pagado',
+          montoPagado: Number(formData.monto),
+          cuenta: formData.cuenta,
+        });
+      }
+
       setFormData({
         descripcion: '',
         monto: '',
-        categoria: '',
-        medioPago: '',
-        cuotas: '1',
-        esFijo: false,
+        fechaVencimiento: '',
+        cuenta: '',
       });
     } catch (err) {
       // Error is handled by the store
@@ -47,7 +55,19 @@ export const NuevoGasto: React.FC = () => {
           {error}
         </div>
       )}
+
       <div className="space-y-4">
+        <div className="flex items-center mb-4">
+          <input
+            type="checkbox"
+            checked={esFijo}
+            onChange={(e) => setEsFijo(e.target.checked)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-400 dark:border-gray-600 rounded shadow-sm"
+            disabled={loading}
+          />
+          <label className="ml-2 block text-sm text-gray-700 dark:text-gray-300">Gasto Fijo</label>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Descripción</label>
           <input
@@ -59,6 +79,7 @@ export const NuevoGasto: React.FC = () => {
             disabled={loading}
           />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Monto</label>
           <input
@@ -72,61 +93,39 @@ export const NuevoGasto: React.FC = () => {
             disabled={loading}
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Categoría</label>
-          <select
-            value={formData.categoria}
-            onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-            className="mt-1 block w-full form-input-enhanced rounded-md"
-            required
-            disabled={loading}
-          >
-            <option value="">Seleccionar categoría</option>
-            {categorias.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Medio de Pago</label>
-          <select
-            value={formData.medioPago}
-            onChange={(e) => setFormData({ ...formData, medioPago: e.target.value })}
-            className="mt-1 block w-full form-input-enhanced rounded-md"
-            required
-            disabled={loading}
-          >
-            <option value="">Seleccionar medio de pago</option>
-            {mediosPago.map((medio) => (
-              <option key={medio.id} value={medio.id}>
-                {medio.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cuotas</label>
-          <input
-            type="number"
-            min="1"
-            value={formData.cuotas}
-            onChange={(e) => setFormData({ ...formData, cuotas: e.target.value })}
-            className="mt-1 block w-full form-input-enhanced rounded-md"
-            disabled={loading}
-          />
-        </div>
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.esFijo}
-            onChange={(e) => setFormData({ ...formData, esFijo: e.target.checked })}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-400 dark:border-gray-600 rounded shadow-sm"
-            disabled={loading}
-          />
-          <label className="ml-2 block text-sm text-gray-700 dark:text-gray-300">Gasto Fijo</label>
-        </div>
+
+        {esFijo ? (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Fecha de Vencimiento</label>
+            <input
+              type="date"
+              value={formData.fechaVencimiento}
+              onChange={(e) => setFormData({ ...formData, fechaVencimiento: e.target.value })}
+              className="mt-1 block w-full form-input-enhanced rounded-md"
+              required
+              disabled={loading}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Cuenta</label>
+            <select
+              value={formData.cuenta}
+              onChange={(e) => setFormData({ ...formData, cuenta: e.target.value })}
+              className="mt-1 block w-full form-input-enhanced rounded-md"
+              required
+              disabled={loading}
+            >
+              <option value="">Seleccionar cuenta</option>
+              {categoriasIngreso.map((cuenta) => (
+                <option key={cuenta.id} value={cuenta.id}>
+                  {cuenta.nombre} (Saldo: ${(cuenta.saldo || 0).toFixed(2)})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <button
           type="submit"
           className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"

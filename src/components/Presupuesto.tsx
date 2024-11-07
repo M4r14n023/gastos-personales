@@ -1,8 +1,123 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Download, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+interface TransferenciaModalProps {
+  categoriasIngreso: any[];
+  onClose: () => void;
+  onConfirm: (origen: string, destino: string, monto: number) => Promise<void>;
+}
+
+const TransferenciaModal: React.FC<TransferenciaModalProps> = ({ categoriasIngreso, onClose, onConfirm }) => {
+  const [origen, setOrigen] = useState('');
+  const [destino, setDestino] = useState('');
+  const [monto, setMonto] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!origen || !destino || !monto) {
+      setError('Todos los campos son requeridos');
+      return;
+    }
+    if (origen === destino) {
+      setError('Las cuentas deben ser diferentes');
+      return;
+    }
+    if (Number(monto) <= 0) {
+      setError('El monto debe ser mayor a 0');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onConfirm(origen, destino, Number(monto));
+      onClose();
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-lg font-medium mb-4">Transferir entre Cuentas</h3>
+        {error && (
+          <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Cuenta Origen</label>
+            <select
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            >
+              <option value="">Seleccionar cuenta</option>
+              {categoriasIngreso.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nombre} (${cat.saldo.toFixed(2)})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Cuenta Destino</label>
+            <select
+              value={destino}
+              onChange={(e) => setDestino(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            >
+              <option value="">Seleccionar cuenta</option>
+              {categoriasIngreso.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nombre} (${cat.saldo.toFixed(2)})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Monto</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {loading ? 'Procesando...' : 'Confirmar Transferencia'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 export const Presupuesto: React.FC = () => {
   const { 
@@ -12,6 +127,7 @@ export const Presupuesto: React.FC = () => {
     agregarIngreso, 
     eliminarIngreso,
     agregarCategoriaIngreso,
+    transferirEntreCuentas,
     generarCierreBalance,
     loading,
     error 
@@ -20,11 +136,13 @@ export const Presupuesto: React.FC = () => {
   const [nuevoIngreso, setNuevoIngreso] = useState({
     descripcion: '',
     monto: '',
-    categoria: ''
+    categoria: '',
+    cuenta: ''
   });
 
   const [nuevaCategoria, setNuevaCategoria] = useState('');
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
+  const [mostrarTransferencia, setMostrarTransferencia] = useState(false);
 
   const totalIngresos = ingresos.reduce((sum, ingreso) => sum + ingreso.monto, 0);
   const totalGastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
@@ -33,15 +151,16 @@ export const Presupuesto: React.FC = () => {
 
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (nuevoIngreso.descripcion && nuevoIngreso.monto && nuevoIngreso.categoria) {
+    if (nuevoIngreso.descripcion && nuevoIngreso.monto && nuevoIngreso.categoria && nuevoIngreso.cuenta) {
       try {
         await agregarIngreso({
           descripcion: nuevoIngreso.descripcion,
           monto: Number(nuevoIngreso.monto),
           categoria: nuevoIngreso.categoria,
+          cuenta: nuevoIngreso.cuenta,
           fecha: new Date()
         });
-        setNuevoIngreso({ descripcion: '', monto: '', categoria: '' });
+        setNuevoIngreso({ descripcion: '', monto: '', categoria: '', cuenta: '' });
       } catch (error) {
         // Error is handled by the store
       }
@@ -52,7 +171,7 @@ export const Presupuesto: React.FC = () => {
     e.preventDefault();
     if (nuevaCategoria.trim()) {
       try {
-        await agregarCategoriaIngreso({ nombre: nuevaCategoria.trim() });
+        await agregarCategoriaIngreso({ nombre: nuevaCategoria.trim(), saldo: 0 });
         setNuevaCategoria('');
         setMostrarFormCategoria(false);
       } catch (error) {
@@ -68,6 +187,14 @@ export const Presupuesto: React.FC = () => {
       } catch (error) {
         // Error is handled by the store
       }
+    }
+  };
+
+  const handleTransferencia = async (origen: string, destino: string, monto: number) => {
+    try {
+      await transferirEntreCuentas(origen, destino, monto);
+    } catch (error) {
+      // Error is handled by the store
     }
   };
 
@@ -101,6 +228,28 @@ export const Presupuesto: React.FC = () => {
         </div>
       </div>
 
+      {/* Resumen de Cuentas */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800">Cuentas</h2>
+          <button
+            onClick={() => setMostrarTransferencia(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+          >
+            <ArrowRightLeft className="mr-2 h-5 w-5" />
+            Transferir
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {categoriasIngreso.map((cuenta) => (
+            <div key={cuenta.id} className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-800">{cuenta.nombre}</h3>
+              <p className="text-xl font-bold text-green-600">${cuenta.saldo.toFixed(2)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Formulario de Nuevo Ingreso */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
@@ -109,7 +258,7 @@ export const Presupuesto: React.FC = () => {
             onClick={() => setMostrarFormCategoria(!mostrarFormCategoria)}
             className="text-blue-600 hover:text-blue-800"
           >
-            {mostrarFormCategoria ? 'Cancelar' : 'Nueva Categoría'}
+            {mostrarFormCategoria ? 'Cancelar' : 'Nueva Cuenta'}
           </button>
         </div>
 
@@ -120,7 +269,7 @@ export const Presupuesto: React.FC = () => {
                 type="text"
                 value={nuevaCategoria}
                 onChange={(e) => setNuevaCategoria(e.target.value)}
-                placeholder="Nombre de la categoría"
+                placeholder="Nombre de la cuenta"
                 className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 disabled={loading}
               />
@@ -178,6 +327,23 @@ export const Presupuesto: React.FC = () => {
               ))}
             </select>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Cuenta</label>
+            <select
+              value={nuevoIngreso.cuenta}
+              onChange={(e) => setNuevoIngreso({ ...nuevoIngreso, cuenta: e.target.value })}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              required
+              disabled={loading}
+            >
+              <option value="">Seleccionar cuenta</option>
+              {categoriasIngreso.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="submit"
             className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
@@ -213,6 +379,7 @@ export const Presupuesto: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
@@ -228,6 +395,9 @@ export const Presupuesto: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {categoriasIngreso.find(cat => cat.id === ingreso.categoria)?.nombre}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {categoriasIngreso.find(cat => cat.id === ingreso.cuenta)?.nombre}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">
                       ${ingreso.monto.toFixed(2)}
@@ -248,6 +418,14 @@ export const Presupuesto: React.FC = () => {
           </div>
         )}
       </div>
+
+      {mostrarTransferencia && (
+        <TransferenciaModal
+          categoriasIngreso={categoriasIngreso}
+          onClose={() => setMostrarTransferencia(false)}
+          onConfirm={handleTransferencia}
+        />
+      )}
     </div>
   );
 };

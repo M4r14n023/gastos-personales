@@ -8,6 +8,7 @@ import { Presupuesto } from './Presupuesto';
 import { Balances } from './Balances';
 import { ListaCreditos } from './Creditos/ListaCreditos';
 import { ThemeToggle } from './ThemeToggle';
+import { OfflineIndicator } from './OfflineIndicator';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
 import { LayoutGrid, Settings, PlusCircle, List, LogOut, Wallet, FileText, CreditCard } from 'lucide-react';
@@ -147,6 +148,8 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
       </footer>
+
+      <OfflineIndicator />
     </div>
   );
 };

@@ -1,26 +1,37 @@
 import React from 'react';
 import { useStore } from '../store/useStore';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Download, TrendingUp, TrendingDown } from 'lucide-react';
+import { Balance } from '../types';
 
 export const Balances: React.FC = () => {
-  const { balances, loading, error } = useStore();
+  const { balances = [], loading, error } = useStore();
 
-  const sortedBalances = [...balances].sort((a, b) => b.fecha.getTime() - a.fecha.getTime());
+  const sortedBalances = [...(Array.isArray(balances) ? balances : [])].sort((a, b) => {
+    const dateA = a.fecha instanceof Date ? a.fecha : new Date(a.fecha);
+    const dateB = b.fecha instanceof Date ? b.fecha : new Date(b.fecha);
+    return dateB.getTime() - dateA.getTime();
+  });
 
-  const getVariacion = (actual: number, anterior: number) => {
+  const getVariacion = (actual: number, anterior: number): number | null => {
     if (!anterior) return null;
-    const variacion = ((actual - anterior) / anterior) * 100;
-    return variacion;
+    return ((actual - anterior) / anterior) * 100;
+  };
+
+  const formatDate = (date: Date | string | number): string => {
+    const parsedDate = date instanceof Date ? date : new Date(date);
+    return isValid(parsedDate) ? format(parsedDate, 'dd/MM/yyyy', { locale: es }) : 'Fecha inválida';
   };
 
   const downloadBalanceCSV = () => {
+    if (!Array.isArray(balances) || balances.length === 0) return;
+
     const headers = ['Fecha', 'Gastos Fijos', 'Gastos Variables', 'Ingresos', 'Saldo Final'];
     const csvContent = [
       headers.join(','),
       ...sortedBalances.map(balance => [
-        format(balance.fecha instanceof Date ? balance.fecha : new Date(balance.fecha), 'dd/MM/yyyy'),
+        formatDate(balance.fecha),
         balance.gastosFijos.toFixed(2),
         balance.gastosVariables.toFixed(2),
         balance.ingresos.toFixed(2),
@@ -70,13 +81,14 @@ export const Balances: React.FC = () => {
           <button
             onClick={downloadBalanceCSV}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            disabled={!Array.isArray(balances) || balances.length === 0}
           >
             <Download className="mr-2 h-5 w-5" />
             Descargar CSV
           </button>
         </div>
 
-        {balances.length === 0 ? (
+        {!Array.isArray(balances) || balances.length === 0 ? (
           <p className="text-gray-500 text-center py-4">No hay balances registrados</p>
         ) : (
           <div className="overflow-x-auto">
@@ -94,12 +106,12 @@ export const Balances: React.FC = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedBalances.map((balance, index) => {
                   const prevBalance = sortedBalances[index + 1];
-                  const variacion = getVariacion(balance.saldoFinal, prevBalance?.saldoFinal);
+                  const variacion = prevBalance ? getVariacion(balance.saldoFinal, prevBalance.saldoFinal) : null;
                   
                   return (
                     <tr key={balance.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(balance.fecha instanceof Date ? balance.fecha : new Date(balance.fecha), 'dd/MM/yyyy', { locale: es })}
+                        {formatDate(balance.fecha)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">
                         ${balance.gastosFijos.toFixed(2)}
