@@ -4,8 +4,6 @@ import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2 } from 'lucide
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-<button onClick={() => window.open('./tutorial-presupuesto.html', '_blank')}>Abrir Tutorial</button>
-
 interface TransferenciaModalProps {
   categoriasIngreso: any[];
   onClose: () => void;
@@ -50,6 +48,13 @@ const EditarCuentaModal: React.FC<EditarCuentaModalProps> = ({ cuenta, onClose, 
             {error}
           </div>
         )}
+
+           {/* Botón de Abrir Tutorial */}
+    <button onClick={() => window.open('./tutorial-presupuesto.html', '_blank')} className="mb-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+      Abrir Tutorial
+    </button>
+
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Nombre de la Cuenta</label>
@@ -117,6 +122,7 @@ const TransferenciaModal: React.FC<TransferenciaModalProps> = ({ categoriasIngre
   };
 
   return (
+    
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
         <h3 className="text-lg font-medium mb-4">Transferir entre Cuentas</h3>
