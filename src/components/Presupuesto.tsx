@@ -329,9 +329,9 @@ export const Presupuesto: React.FC = () => {
 
 
                      {/* Botón de Abrir Tutorial */}
-    <button onClick={() => window.open('/src/tutorial-presupuesto.html', '_blank')} className="mb-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
-      ?
-    </button>
+                     <a href="./tutorial.presupuesto.html" target="_blank" className="mb-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+                    ?
+                    </a>
 
           <button
             onClick={() => setMostrarTransferencia(true)}
