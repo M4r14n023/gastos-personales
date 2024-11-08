@@ -2,6 +2,20 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { PlusCircle } from 'lucide-react';
 
+// Componente Modal
+const Modal = ({ show, onClose, title, children }) => {
+  if (!show) return null;
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h2>{title}</h2>
+        <button onClick={onClose}>Close</button>
+        <div>{children}</div>
+      </div>
+    </div>
+  );
+};
+
 export const NuevoGasto: React.FC = () => {
   const { categoriasIngreso = [], agregarGasto, loading, error } = useStore();
   const [esFijo, setEsFijo] = useState(false);
@@ -11,6 +25,9 @@ export const NuevoGasto: React.FC = () => {
     fechaVencimiento: '',
     cuenta: '',
   });
+
+  // Estado para controlar la visibilidad del modal
+  const [showHelp, setShowHelp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +55,27 @@ export const NuevoGasto: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Nuevo Gasto</h2>
+      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white flex items-center">
+        Nuevo Gasto
+        {/* Ícono de ayuda */}
+        <button type="button" onClick={() => setShowHelp(true)} className="ml-2 text-blue-500">
+          ?
+        </button>
+      </h2>
+
+      {/* Modal para el tutorial */}
+      <Modal show={showHelp} onClose={() => setShowHelp(false)} title="Tutorial de la Función 'Nuevo Gasto'">
+        <h3>Pasos para Agregar un Gasto</h3>
+        <p><strong>1. Marcar el Gasto como Fijo o Variable:</strong> Si deseas que el gasto sea recurrente, activa la casilla "Gasto Fijo".</p>
+        <p><strong>2. Descripción del Gasto:</strong> Ingresa un título para el gasto, como "Renta de oficina".</p>
+        <p><strong>3. Monto:</strong> Ingresa el valor del gasto. Usa puntos decimales para los centavos.</p>
+        <p><strong>4. Fecha de Vencimiento (solo para Gastos Fijos):</strong> Si el gasto es fijo, selecciona la fecha límite de pago.</p>
+        <p><strong>5. Cuenta:</strong> Si el gasto no es fijo, selecciona la cuenta desde donde se tomará el monto.</p>
+        <p><strong>6. Agregar el Gasto:</strong> Haz clic en "Agregar Gasto" para registrarlo.</p>
+        <p><strong>Posibles Mensajes de Error:</strong> Si el saldo de la cuenta es insuficiente o hay un error en el formulario, se mostrará un mensaje en rojo.</p>
+        <p><strong>Notas Importantes:</strong> Los gastos fijos se marcarán como "pendiente" hasta la fecha de vencimiento, mientras que los no fijos se consideran pagados al momento de registrarlos.</p>
+      </Modal>
+
       {error && (
         <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded">
           {error}
