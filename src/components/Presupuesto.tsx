@@ -4,6 +4,8 @@ import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2 } from 'lucide
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+<button onClick={() => window.open('./tutorial-presupuesto.html', '_blank')}>Abrir Tutorial</button>
+
 interface TransferenciaModalProps {
   categoriasIngreso: any[];
   onClose: () => void;
