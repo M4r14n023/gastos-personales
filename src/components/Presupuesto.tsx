@@ -49,12 +49,6 @@ const EditarCuentaModal: React.FC<EditarCuentaModalProps> = ({ cuenta, onClose, 
           </div>
         )}
 
-           {/* Botón de Abrir Tutorial */}
-    <button onClick={() => window.open('/tutorial-presupuesto.html', '_blank')} className="mb-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
-      Abrir Tutorial
-    </button>
-
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Nombre de la Cuenta</label>
@@ -332,6 +326,13 @@ export const Presupuesto: React.FC = () => {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800">Cuentas</h2>
+
+          
+                     {/* Botón de Abrir Tutorial */}
+    <button onClick={() => window.open('/tutorial-presupuesto.html', '_blank')} className="mb-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+      Abrir Tutorial
+    </button>
+
           <button
             onClick={() => setMostrarTransferencia(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
