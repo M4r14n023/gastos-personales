@@ -13,12 +13,13 @@ import {
   deleteDoc,
   getDoc 
 } from 'firebase/firestore';
-import { CategoriaIngreso, Gasto, Ingreso } from '../types';
+import { CategoriaIngreso, Gasto, Ingreso, Credito } from '../types';
 
 interface State {
   gastos: Gasto[];
   categoriasIngreso: CategoriaIngreso[];
   ingresos: Ingreso[];
+  creditos: Credito[];
   loading: boolean;
   error: string | null;
   initialized: boolean;
@@ -33,15 +34,19 @@ interface State {
   eliminarIngreso: (id: string) => Promise<void>;
   transferirEntreCuentas: (origen: string, destino: string, monto: number) => Promise<void>;
   generarCierreBalance: () => Promise<void>;
-  initializeUserData: () => Promise<void>;
   cargarCategoriasIngreso: () => Promise<void>;
   cargarIngresos: () => Promise<void>;
+  cargarCreditos: () => Promise<void>;
+  agregarCredito: (credito: Omit<Credito, 'id'>) => Promise<void>;
+  adelantarCuotasCredito: (creditoId: string, monto: number, cuotas: number[]) => Promise<void>;
+  initializeUserData: () => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
   gastos: [],
   categoriasIngreso: [],
   ingresos: [],
+  creditos: [],
   loading: false,
   error: null,
   initialized: false,
@@ -63,6 +68,102 @@ export const useStore = create<State>((set, get) => ({
       set({ categoriasIngreso: categorias });
     } catch (error) {
       console.error('Error loading income categories:', error);
+    }
+  },
+
+  cargarCreditos: async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const creditosSnapshot = await getDocs(
+        query(collection(db, 'creditos'), where('userId', '==', user.uid))
+      );
+      
+      const creditos = creditosSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Credito[];
+
+      set({ creditos });
+    } catch (error) {
+      console.error('Error loading credits:', error);
+    }
+  },
+
+  agregarCredito: async (credito) => {
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
+
+    set({ loading: true, error: null });
+    try {
+      await addDoc(collection(db, 'creditos'), {
+        ...credito,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+      
+      await get().cargarCreditos();
+    } catch (error: any) {
+      console.error('Error al agregar crédito:', error);
+      set({ error: `Error al agregar crédito: ${error.message || 'Error desconocido'}` });
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  adelantarCuotasCredito: async (creditoId, monto, cuotas) => {
+    const user = auth.currentUser;
+    if (!user) {
+      set({ error: 'Usuario no autenticado' });
+      return;
+    }
+
+    set({ loading: true, error: null });
+    try {
+      const creditoRef = doc(db, 'creditos', creditoId);
+      const creditoDoc = await getDoc(creditoRef);
+      
+      if (!creditoDoc.exists()) {
+        throw new Error('Crédito no encontrado');
+      }
+
+      const credito = creditoDoc.data() as Credito;
+      const cuotasActualizadas = credito.cuotas.map(cuota => {
+        if (cuotas.includes(cuota.numero)) {
+          return { ...cuota, pagada: true };
+        }
+        return cuota;
+      });
+
+      const montoRestante = credito.montoRestante! - monto;
+      
+      await updateDoc(creditoRef, {
+        cuotas: cuotasActualizadas,
+        montoRestante,
+        adelantos: [
+          ...(credito.adelantos || []),
+          {
+            id: Date.now().toString(),
+            fecha: new Date(),
+            monto,
+            cuotasAdelantadas: cuotas
+          }
+        ],
+        updatedAt: serverTimestamp()
+      });
+
+      await get().cargarCreditos();
+    } catch (error: any) {
+      console.error('Error al adelantar cuotas:', error);
+      set({ error: `Error al adelantar cuotas: ${error.message || 'Error desconocido'}` });
+      throw error;
+    } finally {
+      set({ loading: false });
     }
   },
 
@@ -482,6 +583,7 @@ export const useStore = create<State>((set, get) => ({
 
       await get().cargarCategoriasIngreso();
       await get().cargarIngresos();
+      await get().cargarCreditos();
       set({ initialized: true });
     } catch (error: any) {
       console.error('Error al inicializar datos:', error);
