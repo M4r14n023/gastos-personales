@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 import { getAnalytics } from 'firebase/analytics';
 
@@ -21,15 +21,18 @@ enableIndexedDbPersistence(db, {
   cacheSizeBytes: CACHE_SIZE_UNLIMITED
 }).catch((err) => {
   if (err.code === 'failed-precondition') {
-    // Multiple tabs open, persistence can only be enabled in one tab at a time
     console.warn('Firebase persistence failed to enable: Multiple tabs open');
   } else if (err.code === 'unimplemented') {
-    // The current browser doesn't support persistence
     console.warn('Firebase persistence not supported in this browser');
   }
 });
 
 const auth = getAuth(app);
 auth.useDeviceLanguage();
+
+// Set session persistence to require login after closing the window
+setPersistence(auth, browserSessionPersistence).catch((error) => {
+  console.error("Error setting persistence:", error);
+});
 
 export { auth, db };
