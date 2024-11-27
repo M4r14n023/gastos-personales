@@ -33,7 +33,6 @@ interface State {
   agregarIngreso: (ingreso: Omit<Ingreso, 'id'>) => Promise<void>;
   eliminarIngreso: (id: string) => Promise<void>;
   transferirEntreCuentas: (origen: string, destino: string, monto: number) => Promise<void>;
-  generarCierreBalance: () => Promise<void>;
   cargarCategoriasIngreso: () => Promise<void>;
   cargarIngresos: () => Promise<void>;
   cargarCreditos: () => Promise<void>;
@@ -490,56 +489,6 @@ export const useStore = create<State>((set, get) => ({
     } catch (error: any) {
       console.error('Error al transferir entre cuentas:', error);
       set({ error: `Error al transferir entre cuentas: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  generarCierreBalance: async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      const batch = writeBatch(db);
-      
-      const gastosVariables = get().gastos.filter(g => !g.esFijo);
-      const ingresos = get().ingresos;
-      
-      const totalGastosFijos = get().gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
-      const totalGastosVariables = gastosVariables.reduce((sum, g) => sum + g.monto, 0);
-      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
-      
-      // Create balance record
-      const balanceRef = doc(collection(db, 'balances'));
-      batch.set(balanceRef, {
-        fecha: new Date(),
-        gastosFijos: totalGastosFijos,
-        gastosVariables: totalGastosVariables,
-        ingresos: totalIngresos,
-        saldoFinal: totalIngresos - (totalGastosFijos + totalGastosVariables),
-        userId: user.uid
-      });
-      
-      // Delete variable expenses and incomes
-      gastosVariables.forEach(gasto => {
-        batch.delete(doc(db, 'gastos', gasto.id));
-      });
-      
-      ingresos.forEach(ingreso => {
-        batch.delete(doc(db, 'ingresos', ingreso.id));
-      });
-      
-      await batch.commit();
-      await get().cargarGastos();
-      await get().cargarIngresos();
-    } catch (error: any) {
-      console.error('Error al generar cierre de balance:', error);
-      set({ error: `Error al generar cierre de balance: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });

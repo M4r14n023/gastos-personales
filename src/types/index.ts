@@ -59,11 +59,32 @@ export interface TransferenciaCuenta {
   userId?: string;
 }
 
-export interface Balance {
-  id: string;
+export interface CuotaCredito {
+  numero: number;
   fecha: Date;
-  gastosFijos: number;
-  gastosVariables: number;
-  ingresos: number;
-  saldoFinal: number;
+  cuota: number;
+  amortizacion: number;
+  interes: number;
+  saldoRestante: number;
+  pagada: boolean;
+}
+
+export interface Credito {
+  id: string;
+  montoSolicitado: number;
+  entidadBancaria: string;
+  tasaNominalAnual: number;
+  mesesFinanciamiento: number;
+  sistemaAmortizacion: 'frances' | 'aleman' | 'tasaFija';
+  estado: 'simulacion' | 'activo';
+  cuotas: CuotaCredito[];
+  fechaSolicitud?: Date;
+  montoRestante?: number;
+  fechaUltimaCuota?: Date;
+  adelantos?: {
+    id: string;
+    fecha: Date;
+    monto: number;
+    cuotasAdelantadas: number[];
+  }[];
 }

@@ -4,12 +4,11 @@ import { NuevoGasto } from './NuevoGasto';
 import { ListaGastos } from './ListaGastos';
 import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
-import { Balances } from './Balances';
 import { ListaCreditos } from './Creditos/ListaCreditos';
 import { ThemeToggle } from './ThemeToggle';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, PlusCircle, List, LogOut, Wallet, FileText, CreditCard } from 'lucide-react';
+import { LayoutGrid, PlusCircle, List, LogOut, Wallet, CreditCard } from 'lucide-react';
 import { OfflineIndicator } from './OfflineIndicator';
 
 export const Dashboard: React.FC = () => {
@@ -44,7 +43,6 @@ export const Dashboard: React.FC = () => {
     { id: 'lista', name: 'Lista de Gastos', icon: List },
     { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
     { id: 'creditos', name: 'Créditos', icon: CreditCard },
-    { id: 'balances', name: 'Balances', icon: FileText },
   ];
 
   return (
@@ -134,7 +132,6 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'lista' && <ListaGastos />}
           {activeTab === 'presupuesto' && <Presupuesto />}
           {activeTab === 'creditos' && <ListaCreditos creditos={[]} onSave={async () => {}} onAdelantarCuotas={async () => {}} />}
-          {activeTab === 'balances' && <Balances />}
         </main>
       </div>
 
