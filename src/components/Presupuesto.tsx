@@ -109,7 +109,7 @@ export const Presupuesto: React.FC = () => {
   const totalGastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
   const totalGastosVariables = gastos.filter(g => !g.esFijo).reduce((sum, g) => sum + g.monto, 0);
   const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
-  const saldoDisponible = totalCuentas - (totalGastosFijos + totalGastosVariables);
+  const saldoDisponible = totalCuentas;
 
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
