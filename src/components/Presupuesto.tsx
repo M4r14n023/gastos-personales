@@ -95,7 +95,8 @@ export const Presupuesto: React.FC = () => {
   const [nuevoIngreso, setNuevoIngreso] = useState({
     descripcion: '',
     monto: '',
-    cuenta: ''
+    cuenta: '',
+    fecha: new Date().toISOString().split('T')[0] // Fecha actual en formato YYYY-MM-DD
   });
 
   const [nuevaCategoria, setNuevaCategoria] = useState('');
@@ -121,7 +122,7 @@ export const Presupuesto: React.FC = () => {
           cuenta: nuevoIngreso.cuenta,
           fecha: new Date.toISOString()
         });
-        setNuevoIngreso({ descripcion: '', monto: '', cuenta: '' });
+        setNuevoIngreso({ descripcion: '', monto: '', cuenta: '' , fecha: new Date().toISOString().split('T')[0] });
       } catch (error) {
         // Error is handled by the store
       }
