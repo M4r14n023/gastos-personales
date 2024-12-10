@@ -220,67 +220,63 @@ export const ListaGastos: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {gastos.map((gasto) => {
-                const fechaMostrada = gasto.esFijo ? gasto.fechaVencimiento : gasto.fecha;
-                const fechaClase = gasto.esFijo ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400';
-                
-                return (
-                  <tr key={gasto.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button 
-                        onClick={() => setGastoSeleccionado(gasto)}
-                        className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full"
-                      >
-                        {getEstadoPagoIcon(gasto)}
-                      </button>
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${fechaClase}`}>
-                      {formatDate(fechaMostrada)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {gasto.descripcion}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      ${gasto.monto.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                      ${gasto.montoPagado.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
-                      ${(gasto.monto - gasto.montoPagado).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {gasto.cuenta ? categoriasIngreso.find(c => c.id === gasto.cuenta)?.nombre : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {gasto.esFijo ? 'Fijo' : 'Variable'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => eliminarGasto(gasto.id)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50"
-                        disabled={loading}
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+<tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+{gastos.map((gasto) => (
+  <tr key={gasto.id}>
+    <td className="px-6 py-4 whitespace-nowrap">
+      <button 
+        onClick={() => setGastoSeleccionado(gasto)}
+        className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full"
+        title={gasto.esFijo ? 'Gasto Fijo' : 'Gasto Variable'}
+      >
+        {getEstadoPagoIcon(gasto)}
+      </button>
+    </td>
+    <td className={`px-6 py-4 whitespace-nowrap text-sm ${gasto.esFijo ? 'text-orange-600' : 'text-blue-600'}`}>
+      {formatDate(gasto.fecha)}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+      {gasto.descripcion}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+      ${gasto.monto.toFixed(2)}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
+      ${gasto.montoPagado.toFixed(2)}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
+      ${(gasto.monto - gasto.montoPagado).toFixed(2)}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+       {gasto.cuenta ? categoriasIngreso.find(c => c.id === gasto.cuenta)?.nombre : '-'}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+      {gasto.esFijo ? 'Fijo' : 'Variable'}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+      <button
+        onClick={() => eliminarGasto(gasto.id)}
+        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
+        disabled={loading}
+      >
+        <Trash2 className="h-5 w-5" />
+      </button>
+    </td>
+  </tr>
+))}
+</tbody>
+</table>
+</div>
+)}
 
-      {gastoSeleccionado && (
-        <PagoModal
-          gasto={gastoSeleccionado}
-          onClose={() => setGastoSeleccionado(null)}
-          onConfirm={handlePago}
-          categoriasIngreso={categoriasIngreso}
-        />
-      )}
-    </div>
-  );
+{gastoSeleccionado && (
+<PagoModal
+gasto={gastoSeleccionado}
+onClose={() => setGastoSeleccionado(null)}
+onConfirm={handlePago}
+categoriasIngreso={categoriasIngreso}
+/>
+)}
+</div>
+);
 };
