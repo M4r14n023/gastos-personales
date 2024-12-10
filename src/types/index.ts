@@ -1,4 +1,5 @@
 export interface Gasto {
+  fechaVencimiento: any;
   id: string;
   descripcion: string;
   monto: number;
