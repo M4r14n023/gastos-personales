@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Trash2, CheckCircle, AlertCircle, Clock } from 'lucide-react';
-import { ExportButton } from './ExportButton';
 
 interface PagoModalProps {
   gasto: any;
@@ -40,13 +39,10 @@ const PagoModal: React.FC<PagoModalProps> = ({ gasto, onClose, onConfirm, catego
     }
   };
 
-  const selectedAccount = categoriasIngreso.find(cat => cat.id === cuenta);
-  const hasSufficientFunds = selectedAccount ? selectedAccount.saldo >= monto : false;
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-        <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">Registrar Pago</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Registrar Pago</h3>
         {error && (
           <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded">
             {error}
@@ -77,17 +73,20 @@ const PagoModal: React.FC<PagoModalProps> = ({ gasto, onClose, onConfirm, catego
               required
             >
               <option value="">Seleccionar cuenta</option>
-              {categoriasIngreso.map((cat) => (
-                <option 
-                  key={cat.id} 
-                  value={cat.id}
-                  className={cat.saldo < monto ? 'text-gray-400' : ''}
-                  disabled={cat.saldo < monto}
-                >
-                  {cat.nombre} (${cat.saldo.toFixed(2)})
-                  {cat.saldo < monto ? ' - Saldo insuficiente' : ''}
-                </option>
-              ))}
+              {categoriasIngreso.map((cat) => {
+                const saldoInsuficiente = cat.saldo < monto;
+                return (
+                  <option 
+                    key={cat.id} 
+                    value={cat.id}
+                    disabled={saldoInsuficiente}
+                    className={saldoInsuficiente ? 'text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}
+                  >
+                    {cat.nombre} (${(cat.saldo || 0).toFixed(2)})
+                    {saldoInsuficiente ? ' - Saldo insuficiente' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div className="flex justify-end space-x-3">
@@ -100,7 +99,7 @@ const PagoModal: React.FC<PagoModalProps> = ({ gasto, onClose, onConfirm, catego
             </button>
             <button
               type="submit"
-              disabled={loading || !hasSufficientFunds}
+              disabled={loading || (monto > 0 && cuenta && categoriasIngreso.find(c => c.id === cuenta)?.saldo < monto)}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
             >
               {loading ? 'Procesando...' : 'Confirmar Pago'}
@@ -123,7 +122,6 @@ export const ListaGastos: React.FC = () => {
   } = useStore();
 
   const [gastoSeleccionado, setGastoSeleccionado] = useState<any>(null);
-  const [exportSuccess, setExportSuccess] = useState(false);
 
   const handlePago = async (monto: number, cuenta: string) => {
     if (gastoSeleccionado) {
@@ -132,14 +130,9 @@ export const ListaGastos: React.FC = () => {
     }
   };
 
-  const handleExportSuccess = () => {
-    setExportSuccess(true);
-    setTimeout(() => setExportSuccess(false), 3000);
-  };
-
   const getEstadoPagoIcon = (gasto: any) => {
-    if (gasto.esFijo) {
-      return <Clock className="h-5 w-5 text-blue-500" />;
+    if (gasto.esFijo && gasto.estadoPago === 'pendiente') {
+      return <Clock className="h-5 w-5 text-orange-500" />;
     }
     switch (gasto.estadoPago) {
       case 'pagado':
@@ -151,15 +144,20 @@ export const ListaGastos: React.FC = () => {
     }
   };
 
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return '-';
+  const formatDate = (date: any) => {
+    if (!date) return '';
     try {
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
-      if (isNaN(dateObj.getTime())) return '-';
+      const dateObj = date.toDate ? date.toDate() : new Date(date);
       return format(dateObj, 'dd/MM/yyyy', { locale: es });
-    } catch {
-      return '-';
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
     }
+  };
+
+  const getCuentaNombre = (cuentaId: string) => {
+    const cuenta = categoriasIngreso.find(c => c.id === cuentaId);
+    return cuenta ? cuenta.nombre : 'N/A';
   };
 
   if (loading) {
@@ -187,21 +185,7 @@ export const ListaGastos: React.FC = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Lista de Gastos</h2>
-        <div className="flex items-center space-x-4">
-          {exportSuccess && (
-            <span className="text-green-600 dark:text-green-400 text-sm">
-              ¡Exportación completada!
-            </span>
-          )}
-          <ExportButton 
-            gastos={gastos} 
-            onExportSuccess={handleExportSuccess}
-          />
-        </div>
-      </div>
-
+      <h2 className="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Lista de Gastos</h2>
       {gastos.length === 0 ? (
         <p className="text-gray-500 dark:text-gray-400 text-center py-4">No hay gastos registrados</p>
       ) : (
@@ -221,53 +205,49 @@ export const ListaGastos: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {gastos.map((gasto) => {
-                const fechaMostrada = gasto.esFijo ? gasto.fechaVencimiento : gasto.fecha;
-                const fechaClase = gasto.esFijo ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400';
-                
-                return (
-                  <tr key={gasto.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button 
-                        onClick={() => setGastoSeleccionado(gasto)}
-                        className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full"
-                      >
-                        {getEstadoPagoIcon(gasto)}
-                      </button>
-                    </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${fechaClase}`}>
-                      {formatDate(fechaMostrada)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                      {gasto.descripcion}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      ${gasto.monto.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
-                      ${gasto.montoPagado.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
-                      ${(gasto.monto - gasto.montoPagado).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {gasto.cuenta ? categoriasIngreso.find(c => c.id === gasto.cuenta)?.nombre : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {gasto.esFijo ? 'Fijo' : 'Variable'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => eliminarGasto(gasto.id)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50"
-                        disabled={loading}
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {gastos.map((gasto) => (
+                <tr key={gasto.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button 
+                      onClick={() => setGastoSeleccionado(gasto)}
+                      className="hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full"
+                      title={gasto.esFijo ? 'Gasto Fijo' : 'Gasto Variable'}
+                    >
+                      {getEstadoPagoIcon(gasto)}
+                    </button>
+                  </td>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm ${gasto.esFijo ? 'text-orange-600' : 'text-blue-600'}`}>
+                    {formatDate(gasto.fecha)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                    {gasto.descripcion}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    ${gasto.monto.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400">
+                    ${gasto.montoPagado.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400">
+                    ${(gasto.monto - gasto.montoPagado).toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {gasto.cuenta ? getCuentaNombre(gasto.cuenta) : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {gasto.esFijo ? 'Fijo' : 'Variable'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => eliminarGasto(gasto.id)}
+                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-50"
+                      disabled={loading}
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
