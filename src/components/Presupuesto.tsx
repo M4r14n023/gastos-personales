@@ -119,7 +119,7 @@ export const Presupuesto: React.FC = () => {
           descripcion: nuevoIngreso.descripcion,
           monto: Number(nuevoIngreso.monto),
           cuenta: nuevoIngreso.cuenta,
-          fecha: new Date()
+          fecha: new Date.toISOString()
         });
         setNuevoIngreso({ descripcion: '', monto: '', cuenta: '' });
       } catch (error) {
@@ -169,16 +169,17 @@ export const Presupuesto: React.FC = () => {
 
   const formatDate = (date: Date | string | number | undefined) => {
     if (!date) return 'Fecha no disponible';
+    let parsedDate;
     try {
-      const parsedDate = date instanceof Date ? date : new Date(date);
-      if (isValid(parsedDate)) {
-        return format(parsedDate, 'dd/MM/yyyy', { locale: es });
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error);
+        parsedDate = typeof date === 'string' ? new Date(date) : date instanceof Date ? date : new Date(Number(date));
+        if (isValid(parsedDate)) {
+            return format(parsedDate, 'dd/MM/yyyy', { locale: es });
+        }
+    } catch {
+        console.error('Error al formatear la fecha:', date);
     }
     return 'Fecha inválida';
-  };
+};
 
   return (
     <div className="space-y-6">
