@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2, HelpCircle } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+//import { format, isValid } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { HelpTutorial } from './Presupuesto/HelpTutorial';
 import { TransferenciaModal } from './Presupuesto/TransferenciaModal';
