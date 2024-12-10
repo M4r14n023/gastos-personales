@@ -169,17 +169,16 @@ export const Presupuesto: React.FC = () => {
 
   const formatDate = (date: Date | string | number | undefined) => {
     if (!date) return 'Fecha no disponible';
-    let parsedDate;
     try {
-        parsedDate = typeof date === 'string' ? new Date(date) : date instanceof Date ? date : new Date(Number(date));
-        if (isValid(parsedDate)) {
-            return format(parsedDate, 'dd/MM/yyyy', { locale: es });
-        }
-    } catch {
-        console.error('Error al formatear la fecha:', date);
+      const parsedDate = date instanceof Date ? date : new Date(date);
+      if (isValid(parsedDate)) {
+        return format(parsedDate, 'dd/MM/yyyy', { locale: es });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
     }
     return 'Fecha inválida';
-};
+  };
 
   return (
     <div className="space-y-6">
