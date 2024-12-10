@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Trash2, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { ExportButton } from './ExportButton';
