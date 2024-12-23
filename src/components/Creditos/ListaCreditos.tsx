@@ -38,14 +38,14 @@ export const ListaCreditos: React.FC = () => {
     }
   }, [adelantoCuotas.cuotasSeleccionadas, adelantoCuotas.creditoId, creditos]);
 
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return '-';
+  const formatDate = (date: any) => {
+    if (!date) return '';
     try {
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
-      if (isNaN(dateObj.getTime())) return '-';
+      const dateObj = date.toDate ? date.toDate() : new Date(date);
       return format(dateObj, 'dd/MM/yyyy', { locale: es });
-    } catch {
-      return '-';
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '';
     }
   };
 
