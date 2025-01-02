@@ -1,5 +1,5 @@
 export const evaluate = (expression: string): number => {
-  // Validar la expresión con una expresión regular más robusta para permitir números negativos
+  // Validar la expresión
   if (!/^(-?\d+(\.\d+)?|[-+*/^()])+$/.test(expression)) {
     throw new Error('Expresión inválida');
   }
@@ -7,7 +7,7 @@ export const evaluate = (expression: string): number => {
   try {
     // Convertir la expresión a tokens
     const tokens = expression.match(/-?\d*\.?\d+|[+\-*/]/g) || [];
-    
+
     // Validar que haya suficientes tokens
     if (tokens.length < 3 && !expression.startsWith('-')) {
       return parseFloat(expression);
@@ -17,12 +17,15 @@ export const evaluate = (expression: string): number => {
     let result = parseFloat(tokens[0]);
     let currentOp = '';
 
+    // Comenzamos a recorrer los tokens
     for (let i = 1; i < tokens.length; i++) {
       if (i % 2 === 1) {
-        currentOp = tokens[i];
+        currentOp = tokens[i];  // Guardamos el operador
       } else {
         const num = parseFloat(tokens[i]);
-        
+        console.log(`Operando: ${num}, Operación actual: ${currentOp}`);  // Depuración
+
+        // Dependiendo del operador, realizamos la operación correspondiente
         switch (currentOp) {
           case '*':
             result *= num;
@@ -37,6 +40,8 @@ export const evaluate = (expression: string): number => {
           case '-':
             result -= num;
             break;
+          default:
+            throw new Error('Operador desconocido');
         }
       }
     }
