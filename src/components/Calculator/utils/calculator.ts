@@ -1,59 +1,83 @@
 export const evaluate = (expression: string): number => {
-  // Validar la expresión
-  if (!/^(-?\d+(\.\d+)?|[-+*/^()])+$/.test(expression)) {
-    throw new Error('Expresión inválida');
+  // Validar que la expresión no esté vacía
+  if (!expression.trim()) {
+    throw new Error('La expresión está vacía');
   }
 
-  try {
-    // Convertir la expresión a tokens
-    const tokens = expression.match(/-?\d*\.?\d+|[+\-*/]/g) || [];
+  // Eliminar espacios y agregar un operador al final si no existe
+  expression = expression.replace(/\s+/g, '');
+  if (!/[+\-*/]/.test(expression[expression.length - 1])) {
+    expression += '+0';
+  }
 
-    // Validar que haya suficientes tokens
-    if (tokens.length < 3 && !expression.startsWith('-')) {
-      return parseFloat(expression);
-    }
+  // Pila para almacenar números y operadores
+  const numbers: number[] = [];
+  const operators: string[] = [];
+  let num = '';
 
-    // Realizar las operaciones siguiendo el orden de precedencia
-    let result = parseFloat(tokens[0]);
-    let currentOp = '';
+  // Recorremos cada carácter de la expresión
+  for (let i = 0; i < expression.length; i++) {
+    const char = expression[i];
 
-    // Comenzamos a recorrer los tokens
-    for (let i = 1; i < tokens.length; i++) {
-      if (i % 2 === 1) {
-        currentOp = tokens[i];  // Guardamos el operador
-      } else {
-        const num = parseFloat(tokens[i]);
-        console.log(`Operando: ${num}, Operación actual: ${currentOp}`);  // Depuración
-
-        // Dependiendo del operador, realizamos la operación correspondiente
-        switch (currentOp) {
-          case '*':
-            result *= num;
-            break;
-          case '/':
-            if (num === 0) throw new Error('División por cero');
-            result /= num;
-            break;
-          case '+':
-            result += num;
-            break;
-          case '-':
-            result -= num;
-            break;
-          default:
-            throw new Error('Operador desconocido');
-        }
+    // Si es un número o punto decimal, lo agregamos al número en construcción
+    if (/\d|\./.test(char)) {
+      num += char;
+    } else if (/[+\-*/]/.test(char)) {
+      // Si encontramos un operador, lo procesamos
+      if (num) {
+        numbers.push(parseFloat(num));
+        num = '';
       }
-    }
 
-    // Validar el resultado
-    if (isNaN(result) || !isFinite(result)) {
-      throw new Error('Resultado inválido');
-    }
+      // Si hay operadores previos, aplicar la precedencia de operaciones
+      while (operators.length > 0 && precedence(operators[operators.length - 1]) >= precedence(char)) {
+        const operator = operators.pop();
+        const right = numbers.pop()!;
+        const left = numbers.pop()!;
+        numbers.push(operate(left, right, operator!));
+      }
 
-    // Redondear a 8 decimales para evitar errores de punto flotante
-    return Number(result.toFixed(8));
-  } catch (error) {
-    throw new Error('Error al evaluar la expresión');
+      // Agregar el operador actual a la pila
+      operators.push(char);
+    }
   }
+
+  // Función para determinar la precedencia de los operadores
+  function precedence(operator: string): number {
+    return operator === '+' || operator === '-' ? 1 : 2;
+  }
+
+  // Función para realizar las operaciones básicas
+  function operate(left: number, right: number, operator: string): number {
+    switch (operator) {
+      case '+':
+        return left + right;
+      case '-':
+        return left - right;
+      case '*':
+        return left * right;
+      case '/':
+        if (right === 0) throw new Error('División por cero');
+        return left / right;
+      default:
+        throw new Error(`Operador no soportado: ${operator}`);
+    }
+  }
+
+  // Si quedó algún número sin procesar, agregarlo a la pila
+  if (num) {
+    numbers.push(parseFloat(num));
+  }
+
+  // Aplicar las operaciones restantes
+  while (operators.length > 0) {
+    const operator = operators.pop()!;
+    const right = numbers.pop()!;
+    const left = numbers.pop()!;
+    numbers.push(operate(left, right, operator));
+  }
+
+  // El resultado final será el único número en la pila
+  return numbers[0];
 };
+
