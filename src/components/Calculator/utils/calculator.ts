@@ -1,6 +1,6 @@
 export const evaluate = (expression: string): number => {
-  // Validar la expresión
-  if (!/^-?\d*\.?\d*(?:[-+*/]\d*\.?\d*)*$/.test(expression)) {
+  // Validar la expresión con una expresión regular más robusta para permitir números negativos
+  if (!/^(-?\d+(\.\d+)?|[-+*/^()])+$/.test(expression)) {
     throw new Error('Expresión inválida');
   }
 
