@@ -6,7 +6,7 @@ import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
 import { ListaCreditos } from './Creditos/ListaCreditos';
 import { GestionDolares } from './Dolares/GestionDolares';
-import HistorialMovimientos from './HistorialMovimientos';
+//import HistorialMovimientos from './Dolares/HistorialMovimientos';
 import { ThemeToggle } from './ThemeToggle';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
