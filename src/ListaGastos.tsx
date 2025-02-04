@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Trash2, CreditCard, AlertTriangle } from 'lucide-react';
-import { useStore } from './store/useStore';
-import { ExportButton } from './components/ExportButton';
+import { useStore } from '../store/useStore';
+import { ExportButton } from './ExportButton';
 
 export const ListaGastos: React.FC = () => {
   const { 
