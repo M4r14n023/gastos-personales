@@ -5,11 +5,12 @@ import { ListaGastos } from './ListaGastos';
 import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
 import { ListaCreditos } from './Creditos/ListaCreditos';
-import { Calculator } from './Calculator/Calculator';
+import { GestionDolares } from './Dolares/GestionDolares';
+import HistorialMovimientos from './HistorialMovimientos';
 import { ThemeToggle } from './ThemeToggle';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, PlusCircle, List, LogOut, Wallet, CreditCard, Calculator as CalculatorIcon } from 'lucide-react';
+import { LayoutGrid, PlusCircle, List, LogOut, Wallet, CreditCard, DollarSign } from 'lucide-react';
 import { OfflineIndicator } from './OfflineIndicator';
 
 export const Dashboard: React.FC = () => {
@@ -44,7 +45,7 @@ export const Dashboard: React.FC = () => {
     { id: 'lista', name: 'Lista de Gastos', icon: List },
     { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
     { id: 'creditos', name: 'Créditos', icon: CreditCard },
-    { id: 'calculadora', name: 'Calculadora', icon: CalculatorIcon },
+    { id: 'dolares', name: 'Dólares', icon: DollarSign },
   ];
 
   return (
@@ -133,8 +134,8 @@ export const Dashboard: React.FC = () => {
           {activeTab === 'nuevo' && <NuevoGasto />}
           {activeTab === 'lista' && <ListaGastos />}
           {activeTab === 'presupuesto' && <Presupuesto />}
-          {activeTab === 'creditos' && <ListaCreditos creditos={[]} onSave={async () => {}} onAdelantarCuotas={async () => {}} />}
-          {activeTab === 'calculadora' && <Calculator />}
+          {activeTab === 'creditos' && <ListaCreditos />}
+          {activeTab === 'dolares' && <GestionDolares />}
         </main>
       </div>
 
