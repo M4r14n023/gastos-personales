@@ -1,91 +1,28 @@
-export interface Gasto {
-  fechaVencimiento: any;
+// Add these new types to the existing types/index.ts
+export interface MovimientoDolar {
   id: string;
+  tipo: 'compra' | 'venta' | 'pago';
+  montoDolares: number;
+  cotizacion?: number;
+  montoPesos?: number;
+  cuenta?: string;
   descripcion: string;
-  monto: number;
   fecha: Date;
-  categoria: string;
-  medioPago: string;
-  cuotas?: number;
-  cuotaActual?: number;
-  esFijo: boolean;
-  estadoPago: 'pendiente' | 'parcial' | 'pagado';
-  montoPagado: number;
-  pagosParciales?: PagoParcial[];
 }
 
-export interface PagoParcial {
-  id: string;
-  fecha: Date;
-  monto: number;
-  cuentaOrigen: string;
-}
-
-export interface MedioPago {
-  id: string;
-  nombre: string;
-  tipo: 'efectivo' | 'debito' | 'credito';
-}
-
-export interface Categoria {
-  id: string;
-  nombre: string;
-}
-
-export interface Ingreso {
-  id: string;
-  descripcion: string;
-  monto: number;
-  fecha: Date;
-  categoria: string;
+export interface ComprarDolaresParams {
+  montoDolares: number;
+  cotizacion: number;
   cuenta: string;
-  saldoDisponible: number;
 }
 
-export interface CategoriaIngreso {
-  id: string;
-  nombre: string;
-  saldo: number;
-  userId?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+export interface VenderDolaresParams {
+  montoDolares: number;
+  cotizacion: number;
+  cuenta: string;
 }
 
-export interface TransferenciaCuenta {
-  id: string;
-  fecha: Date;
-  cuentaOrigen: string;
-  cuentaDestino: string;
-  monto: number;
-  userId?: string;
-}
-
-export interface CuotaCredito {
-  numero: number;
-  fecha: Date;
-  cuota: number;
-  amortizacion: number;
-  interes: number;
-  saldoRestante: number;
-  pagada: boolean;
-}
-
-export interface Credito {
-  id: string;
-  montoSolicitado: number;
-  entidadBancaria: string;
-  tasaNominalAnual: number;
-  mesesFinanciamiento: number;
-  sistemaAmortizacion: 'frances' | 'aleman' | 'tasaFija';
-  estado: 'simulacion' | 'activo';
-  cuotas: CuotaCredito[];
-  fechaSolicitud?: Date;
-  montoRestante?: number;
-  fechaUltimaCuota?: Date;
-  adelantos?: {
-    id: string;
-    fecha: Date;
-    monto: number;
-    cuotasAdelantadas: number[];
-  }[];
+export interface PagarDolaresParams {
+  montoDolares: number;
+  descripcion: string;
 }

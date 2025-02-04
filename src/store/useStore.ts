@@ -7,493 +7,32 @@ import {
   serverTimestamp, 
   getDocs, 
   query, 
-  where, 
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  getDoc 
+  where,
+  getDoc,
+  setDoc,
+  deleteDoc
 } from 'firebase/firestore';
-import { CategoriaIngreso, Gasto, Ingreso, Credito } from '../types';
+import { createDolaresSlice, DolaresSlice } from './slices/dolaresSlice';
+import { createGastosSlice, GastosSlice } from './slices/gastosSlice';
+import { createIngresosSlice, IngresosSlice } from './slices/ingresosSlice';
+import { createCreditosSlice, CreditosSlice } from './slices/creditosSlice';
 
-interface State {
-  gastos: Gasto[];
-  categoriasIngreso: CategoriaIngreso[];
-  ingresos: Ingreso[];
-  creditos: Credito[];
+interface State extends DolaresSlice, GastosSlice, IngresosSlice, CreditosSlice {
   loading: boolean;
   error: string | null;
   initialized: boolean;
-
-  agregarGasto: (gasto: Omit<Gasto, 'id'>) => Promise<void>;
-  cargarGastos: () => Promise<void>;
-  eliminarGasto: (id: string) => Promise<void>;
-  registrarPago: (id: string, monto: number, cuenta: string) => Promise<void>;
-  agregarCategoriaIngreso: (categoria: { nombre: string; saldo: number }) => Promise<void>;
-  editarCategoriaIngreso: (id: string, nuevoNombre: string) => Promise<void>;
-  agregarIngreso: (ingreso: Omit<Ingreso, 'id'>) => Promise<void>;
-  eliminarIngreso: (id: string) => Promise<void>;
-  transferirEntreCuentas: (origen: string, destino: string, monto: number) => Promise<void>;
-  cargarCategoriasIngreso: () => Promise<void>;
-  cargarIngresos: () => Promise<void>;
-  cargarCreditos: () => Promise<void>;
-  agregarCredito: (credito: Omit<Credito, 'id'>) => Promise<void>;
-  adelantarCuotasCredito: (creditoId: string, monto: number, cuotas: number[]) => Promise<void>;
   initializeUserData: () => Promise<void>;
+  generarCierreBalance: () => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
-  gastos: [],
-  categoriasIngreso: [],
-  ingresos: [],
-  creditos: [],
+  ...createDolaresSlice(set, get),
+  ...createGastosSlice(set, get),
+  ...createIngresosSlice(set, get),
+  ...createCreditosSlice(set, get),
   loading: false,
   error: null,
   initialized: false,
-
-  cargarCategoriasIngreso: async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const categoriasSnapshot = await getDocs(
-        query(collection(db, 'categoriasIngreso'), where('userId', '==', user.uid))
-      );
-      
-      const categorias = categoriasSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CategoriaIngreso[];
-
-      set({ categoriasIngreso: categorias });
-    } catch (error) {
-      console.error('Error loading income categories:', error);
-    }
-  },
-
-  cargarCreditos: async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const creditosSnapshot = await getDocs(
-        query(collection(db, 'creditos'), where('userId', '==', user.uid))
-      );
-      
-      const creditos = creditosSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Credito[];
-
-      set({ creditos });
-    } catch (error) {
-      console.error('Error loading credits:', error);
-    }
-  },
-
-  agregarCredito: async (credito) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      await addDoc(collection(db, 'creditos'), {
-        ...credito,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      
-      await get().cargarCreditos();
-    } catch (error: any) {
-      console.error('Error al agregar crédito:', error);
-      set({ error: `Error al agregar crédito: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  adelantarCuotasCredito: async (creditoId, monto, cuotas) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      const creditoRef = doc(db, 'creditos', creditoId);
-      const creditoDoc = await getDoc(creditoRef);
-      
-      if (!creditoDoc.exists()) {
-        throw new Error('Crédito no encontrado');
-      }
-
-      const credito = creditoDoc.data() as Credito;
-      const cuotasActualizadas = credito.cuotas.map(cuota => {
-        if (cuotas.includes(cuota.numero)) {
-          return { ...cuota, pagada: true };
-        }
-        return cuota;
-      });
-
-      const montoRestante = credito.montoRestante! - monto;
-      
-      await updateDoc(creditoRef, {
-        cuotas: cuotasActualizadas,
-        montoRestante,
-        adelantos: [
-          ...(credito.adelantos || []),
-          {
-            id: Date.now().toString(),
-            fecha: new Date(),
-            monto,
-            cuotasAdelantadas: cuotas
-          }
-        ],
-        updatedAt: serverTimestamp()
-      });
-
-      await get().cargarCreditos();
-    } catch (error: any) {
-      console.error('Error al adelantar cuotas:', error);
-      set({ error: `Error al adelantar cuotas: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  cargarIngresos: async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const ingresosSnapshot = await getDocs(
-        query(collection(db, 'ingresos'), where('userId', '==', user.uid))
-      );
-      
-      const ingresos = ingresosSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Ingreso[];
-
-      set({ ingresos });
-    } catch (error) {
-      console.error('Error loading incomes:', error);
-    }
-  },
-
-  editarCategoriaIngreso: async (id: string, nuevoNombre: string) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      const cuentaRef = doc(db, 'categoriasIngreso', id);
-      await updateDoc(cuentaRef, {
-        nombre: nuevoNombre,
-        updatedAt: serverTimestamp()
-      });
-      await get().cargarCategoriasIngreso();
-    } catch (error: any) {
-      console.error('Error al editar categoría de ingreso:', error);
-      set({ error: `Error al editar categoría de ingreso: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  agregarGasto: async (gasto) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-    
-    set({ loading: true, error: null });
-    
-    try {
-      const batch = writeBatch(db);
-      
-      // Create the expense document
-      const gastoRef = doc(collection(db, 'gastos'));
-      batch.set(gastoRef, {
-        ...gasto,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-
-      // If it's a variable expense, update the account balance
-      if (!gasto.esFijo && gasto.cuenta) {
-        const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
-        const cuentaDoc = await getDoc(cuentaRef);
-        
-        if (cuentaDoc.exists()) {
-          const cuenta = cuentaDoc.data() as CategoriaIngreso;
-          if (cuenta.saldo < gasto.monto) {
-            throw new Error('Saldo insuficiente en la cuenta');
-          }
-          
-          batch.update(cuentaRef, {
-            saldo: cuenta.saldo - gasto.monto,
-            updatedAt: serverTimestamp()
-          });
-        }
-      }
-      
-      await batch.commit();
-      await get().cargarGastos();
-      await get().cargarCategoriasIngreso();
-    } catch (error: any) {
-      console.error('Error al agregar gasto:', error);
-      set({ error: `Error al agregar gasto: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  cargarGastos: async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-
-    try {
-      const gastosSnapshot = await getDocs(
-        query(collection(db, 'gastos'), where('userId', '==', user.uid))
-      );
-      
-      const gastos = gastosSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Gasto[];
-
-      set({ gastos });
-    } catch (error: any) {
-      console.error('Error al cargar gastos:', error);
-      set({ error: `Error al cargar gastos: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  eliminarGasto: async (id) => {
-    set({ loading: true, error: null });
-    try {
-      await deleteDoc(doc(db, 'gastos', id));
-      await get().cargarGastos();
-    } catch (error: any) {
-      console.error('Error al eliminar gasto:', error);
-      set({ error: `Error al eliminar gasto: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  registrarPago: async (id, monto, cuenta) => {
-    set({ loading: true, error: null });
-    try {
-      const batch = writeBatch(db);
-      
-      // Update expense
-      const gastoRef = doc(db, 'gastos', id);
-      const gastoDoc = await getDoc(gastoRef);
-      if (!gastoDoc.exists()) {
-        throw new Error('Gasto no encontrado');
-      }
-      const gasto = gastoDoc.data() as Gasto;
-      
-      const nuevoMontoPagado = gasto.montoPagado + monto;
-      const nuevoEstado = nuevoMontoPagado >= gasto.monto ? 'pagado' : 'parcial';
-      
-      batch.update(gastoRef, {
-        montoPagado: nuevoMontoPagado,
-        estadoPago: nuevoEstado,
-        updatedAt: serverTimestamp()
-      });
-      
-      // Update account balance
-      const cuentaRef = doc(db, 'categoriasIngreso', cuenta);
-      const cuentaDoc = await getDoc(cuentaRef);
-      if (!cuentaDoc.exists()) {
-        throw new Error('Cuenta no encontrada');
-      }
-      const cuentaData = cuentaDoc.data() as CategoriaIngreso;
-      
-      if (cuentaData.saldo < monto) {
-        throw new Error('Saldo insuficiente en la cuenta');
-      }
-      
-      batch.update(cuentaRef, {
-        saldo: cuentaData.saldo - monto,
-        updatedAt: serverTimestamp()
-      });
-      
-      await batch.commit();
-      await get().cargarGastos();
-      await get().cargarCategoriasIngreso();
-    } catch (error: any) {
-      console.error('Error al registrar pago:', error);
-      set({ error: `Error al registrar pago: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  agregarCategoriaIngreso: async (categoria) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      await addDoc(collection(db, 'categoriasIngreso'), {
-        ...categoria,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      await get().cargarCategoriasIngreso();
-    } catch (error: any) {
-      console.error('Error al agregar categoría de ingreso:', error);
-      set({ error: `Error al agregar categoría de ingreso: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  agregarIngreso: async (ingreso) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      const batch = writeBatch(db);
-      
-      // Create income document
-      const ingresoRef = doc(collection(db, 'ingresos'));
-      batch.set(ingresoRef, {
-        ...ingreso,
-        userId: user.uid,
-        createdAt: serverTimestamp()
-      });
-      
-      // Update account balance
-      const cuentaRef = doc(db, 'categoriasIngreso', ingreso.cuenta);
-      const cuentaDoc = await getDoc(cuentaRef);
-      if (!cuentaDoc.exists()) {
-        throw new Error('Cuenta no encontrada');
-      }
-      const cuenta = cuentaDoc.data() as CategoriaIngreso;
-      
-      batch.update(cuentaRef, {
-        saldo: cuenta.saldo + ingreso.monto,
-        updatedAt: serverTimestamp()
-      });
-      
-      await batch.commit();
-      await get().cargarCategoriasIngreso();
-      await get().cargarIngresos();
-    } catch (error: any) {
-      console.error('Error al agregar ingreso:', error);
-      set({ error: `Error al agregar ingreso: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  eliminarIngreso: async (id) => {
-    set({ loading: true, error: null });
-    try {
-      await deleteDoc(doc(db, 'ingresos', id));
-      await get().cargarIngresos();
-    } catch (error: any) {
-      console.error('Error al eliminar ingreso:', error);
-      set({ error: `Error al eliminar ingreso: ${error.message || 'Error desconocido'}` });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  transferirEntreCuentas: async (origen, destino, monto) => {
-    const user = auth.currentUser;
-    if (!user) {
-      set({ error: 'Usuario no autenticado' });
-      return;
-    }
-
-    set({ loading: true, error: null });
-    try {
-      const batch = writeBatch(db);
-      
-      // Get source account
-      const origenRef = doc(db, 'categoriasIngreso', origen);
-      const origenDoc = await getDoc(origenRef);
-      if (!origenDoc.exists()) {
-        throw new Error('Cuenta origen no encontrada');
-      }
-      const origenData = origenDoc.data() as CategoriaIngreso;
-      
-      if (origenData.saldo < monto) {
-        throw new Error('Saldo insuficiente en la cuenta origen');
-      }
-      
-      // Get destination account
-      const destinoRef = doc(db, 'categoriasIngreso', destino);
-      const destinoDoc = await getDoc(destinoRef);
-      if (!destinoDoc.exists()) {
-        throw new Error('Cuenta destino no encontrada');
-      }
-      const destinoData = destinoDoc.data() as CategoriaIngreso;
-      
-      // Update balances
-      batch.update(origenRef, {
-        saldo: origenData.saldo - monto,
-        updatedAt: serverTimestamp()
-      });
-      
-      batch.update(destinoRef, {
-        saldo: destinoData.saldo + monto,
-        updatedAt: serverTimestamp()
-      });
-      
-      // Create transfer record
-      const transferenciaRef = doc(collection(db, 'transferencias'));
-      batch.set(transferenciaRef, {
-        origen,
-        destino,
-        monto,
-        userId: user.uid,
-        fecha: serverTimestamp()
-      });
-      
-      await batch.commit();
-      await get().cargarCategoriasIngreso();
-    } catch (error: any) {
-      console.error('Error al transferir entre cuentas:', error);
-      set({ error: `Error al transferir entre cuentas: ${error.message || 'Error desconocido'}` });
-      throw error;
-    } finally {
-      set({ loading: false });
-    }
-  },
 
   initializeUserData: async () => {
     const user = auth.currentUser;
@@ -505,38 +44,123 @@ export const useStore = create<State>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
+      // Initialize user document
+      const userRef = doc(db, 'usuarios', user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        await setDoc(userRef, {
+          saldoDolares: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      // Initialize default categories if none exist
       const categoriasSnapshot = await getDocs(
         query(collection(db, 'categoriasIngreso'), where('userId', '==', user.uid))
       );
 
       if (categoriasSnapshot.empty) {
         const batch = writeBatch(db);
-
-        // Initialize default income categories
-        const defaultIncomeCategories = [
+        const defaultCategories = [
           { nombre: 'Cuenta Principal', saldo: 0 },
           { nombre: 'Ahorros', saldo: 0 }
         ];
 
-        for (const category of defaultIncomeCategories) {
+        for (const category of defaultCategories) {
           const categoryRef = doc(collection(db, 'categoriasIngreso'));
           batch.set(categoryRef, {
             ...category,
             userId: user.uid,
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
           });
         }
 
         await batch.commit();
       }
 
-      await get().cargarCategoriasIngreso();
-      await get().cargarIngresos();
-      await get().cargarCreditos();
-      set({ initialized: true });
+      // Load all data
+      await Promise.all([
+        get().cargarCategoriasIngreso(),
+        get().cargarIngresos(),
+        get().cargarCreditos(),
+        get().cargarGastos(),
+        get().cargarMovimientosDolares()
+      ]);
+
+      set({ initialized: true, error: null });
     } catch (error: any) {
       console.error('Error al inicializar datos:', error);
-      set({ error: `Error al inicializar datos: ${error.message || 'Error desconocido'}` });
+      set({ 
+        error: `Error al inicializar datos: ${error.message || 'Error desconocido'}`,
+        initialized: false 
+      });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  generarCierreBalance: async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Usuario no autenticado');
+
+    set({ loading: true, error: null });
+
+    try {
+      const batch = writeBatch(db);
+
+      // 1. Crear registro de cierre
+      const cierreRef = doc(collection(db, 'cierresBalance'));
+      const fecha = new Date();
+      const { ingresos, gastos, categoriasIngreso } = get();
+
+      const totalIngresos = ingresos.reduce((sum, i) => sum + i.monto, 0);
+      const totalGastosFijos = gastos.filter(g => g.esFijo).reduce((sum, g) => sum + g.monto, 0);
+      const totalGastosVariables = gastos.filter(g => !g.esFijo).reduce((sum, g) => sum + g.monto, 0);
+      const saldoTotal = categoriasIngreso.reduce((sum, c) => sum + c.saldo, 0);
+
+      batch.set(cierreRef, {
+        fecha,
+        totalIngresos,
+        totalGastosFijos,
+        totalGastosVariables,
+        saldoTotal,
+        userId: user.uid,
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Marcar ingresos como procesados
+      const ingresosQuery = query(collection(db, 'ingresos'), where('userId', '==', user.uid));
+      const ingresosSnapshot = await getDocs(ingresosQuery);
+      ingresosSnapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { procesado: true, updatedAt: serverTimestamp() });
+      });
+
+      // 3. Marcar gastos variables como procesados
+      const gastosQuery = query(collection(db, 'gastos'), where('userId', '==', user.uid));
+      const gastosSnapshot = await getDocs(gastosQuery);
+      gastosSnapshot.docs.forEach(doc => {
+        const gasto = doc.data();
+        if (!gasto.esFijo) {
+          batch.update(doc.ref, { procesado: true, updatedAt: serverTimestamp() });
+        }
+      });
+
+      await batch.commit();
+
+      // 4. Recargar datos
+      await Promise.all([
+        get().cargarIngresos(),
+        get().cargarGastos(),
+        get().cargarCategoriasIngreso()
+      ]);
+
+      set({ error: null });
+    } catch (error: any) {
+      console.error('Error al generar cierre de balance:', error);
+      set({ error: `Error al generar cierre de balance: ${error.message || 'Error desconocido'}` });
       throw error;
     } finally {
       set({ loading: false });
