@@ -9,6 +9,18 @@ interface Props {
 }
 
 export const HistorialMovimientos: React.FC<Props> = ({ movimientos, loading }) => {
+  const formatDate = (date: any) => {
+    if (!date) return '-';
+    try {
+      // Handle Firestore Timestamp
+      const dateObj = date.toDate ? date.toDate() : new Date(date);
+      return format(dateObj, 'dd/MM/yyyy HH:mm', { locale: es });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return '-';
+    }
+  };
+
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -56,7 +68,7 @@ export const HistorialMovimientos: React.FC<Props> = ({ movimientos, loading }) 
           {movimientos.map((mov) => (
             <tr key={mov.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                {format(mov.fecha, 'dd/MM/yyyy HH:mm', { locale: es })}
+                {formatDate(mov.fecha)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
