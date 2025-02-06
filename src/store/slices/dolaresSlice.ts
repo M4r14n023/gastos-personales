@@ -41,9 +41,10 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     const userRef = doc(db, 'usuarios', user.uid);
     const userDoc = await getDoc(userRef);
     const saldoDolaresActual = userDoc.exists() ? (userDoc.data()?.saldoDolares || 0) : 0;
+    const nuevoSaldoDolares = saldoDolaresActual + montoDolares;
     
     batch.set(userRef, {
-      saldoDolares: saldoDolaresActual + montoDolares,
+      saldoDolares: nuevoSaldoDolares,
       updatedAt: serverTimestamp()
     }, { merge: true });
     
@@ -61,6 +62,9 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     });
     
     await batch.commit();
+
+    // Update local state immediately after successful transaction
+    set({ saldoDolares: nuevoSaldoDolares });
     await get().cargarMovimientosDolares();
   },
 
@@ -77,8 +81,10 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     
     if (saldoDolaresActual < montoDolares) throw new Error('Saldo en dólares insuficiente');
     
+    const nuevoSaldoDolares = saldoDolaresActual - montoDolares;
+    
     batch.set(userRef, {
-      saldoDolares: saldoDolaresActual - montoDolares,
+      saldoDolares: nuevoSaldoDolares,
       updatedAt: serverTimestamp()
     }, { merge: true });
     
@@ -109,6 +115,9 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     });
     
     await batch.commit();
+    
+    // Update local state immediately after successful transaction
+    set({ saldoDolares: nuevoSaldoDolares });
     await get().cargarMovimientosDolares();
   },
 
@@ -125,8 +134,10 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     
     if (saldoDolaresActual < montoDolares) throw new Error('Saldo en dólares insuficiente');
     
+    const nuevoSaldoDolares = saldoDolaresActual - montoDolares;
+    
     batch.set(userRef, {
-      saldoDolares: saldoDolaresActual - montoDolares,
+      saldoDolares: nuevoSaldoDolares,
       updatedAt: serverTimestamp()
     }, { merge: true });
     
@@ -141,6 +152,9 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     });
     
     await batch.commit();
+    
+    // Update local state immediately after successful transaction
+    set({ saldoDolares: nuevoSaldoDolares });
     await get().cargarMovimientosDolares();
   },
 
@@ -148,15 +162,28 @@ export const createDolaresSlice: StateCreator<DolaresSlice> = (set, get) => ({
     const user = auth.currentUser;
     if (!user) return;
 
-    const movimientosSnapshot = await getDocs(
-      query(collection(db, 'movimientosDolares'), where('userId', '==', user.uid))
-    );
-    
-    const movimientos = movimientosSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as MovimientoDolar[];
+    try {
+      // Load user data to get current balance
+      const userDoc = await getDoc(doc(db, 'usuarios', user.uid));
+      const saldoDolares = userDoc.exists() ? (userDoc.data()?.saldoDolares || 0) : 0;
 
-    set({ movimientosDolares: movimientos });
+      // Load movements
+      const movimientosSnapshot = await getDocs(
+        query(collection(db, 'movimientosDolares'), where('userId', '==', user.uid))
+      );
+      
+      const movimientos = movimientosSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as MovimientoDolar[];
+
+      set({ 
+        saldoDolares,
+        movimientosDolares: movimientos 
+      });
+    } catch (error) {
+      console.error('Error loading dollar movements:', error);
+      throw error;
+    }
   }
 });
