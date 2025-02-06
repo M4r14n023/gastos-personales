@@ -11,6 +11,7 @@ export interface IngresosSlice {
   agregarIngreso: (ingreso: Omit<Ingreso, 'id' | 'userId'>) => Promise<void>;
   agregarCategoriaIngreso: (categoria: Omit<CategoriaIngreso, 'id' | 'userId'>) => Promise<void>;
   editarCategoriaIngreso: (id: string, nuevoNombre: string) => Promise<void>;
+  editarSaldoCuenta: (id: string, nuevoSaldo: number) => Promise<void>;
   eliminarIngreso: (id: string) => Promise<void>;
   transferirEntreCuentas: (origen: string, destino: string, monto: number) => Promise<void>;
 }
@@ -103,6 +104,38 @@ export const createIngresosSlice: StateCreator<IngresosSlice> = (set, get) => ({
     const categoriaRef = doc(db, 'categoriasIngreso', id);
     await updateDoc(categoriaRef, {
       nombre: nuevoNombre,
+      updatedAt: serverTimestamp()
+    });
+
+    await get().cargarCategoriasIngreso();
+  },
+
+  editarSaldoCuenta: async (id: string, nuevoSaldo: number) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Usuario no autenticado');
+
+    if (nuevoSaldo < 0) throw new Error('El saldo no puede ser negativo');
+    if (!/^\d+(\.\d{0,2})?$/.test(nuevoSaldo.toString())) {
+      throw new Error('El saldo debe tener máximo 2 decimales');
+    }
+
+    const cuentaRef = doc(db, 'categoriasIngreso', id);
+    const cuenta = get().categoriasIngreso.find(c => c.id === id);
+    if (!cuenta) throw new Error('Cuenta no encontrada');
+
+    // Create adjustment record
+    await addDoc(collection(db, 'ajustesSaldo'), {
+      cuentaId: id,
+      saldoAnterior: cuenta.saldo,
+      saldoNuevo: nuevoSaldo,
+      fecha: serverTimestamp(),
+      userId: user.uid,
+      motivo: 'Ajuste manual de saldo'
+    });
+
+    // Update account balance
+    await updateDoc(cuentaRef, {
+      saldo: nuevoSaldo,
       updatedAt: serverTimestamp()
     });
 

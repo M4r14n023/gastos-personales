@@ -1,10 +1,100 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2, HelpCircle } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import { Plus, Download, RefreshCw, Trash2, ArrowRightLeft, Edit2, HelpCircle, Check, X } from 'lucide-react';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { HelpTutorial } from './Presupuesto/HelpTutorial';
 import { TransferenciaModal } from './Presupuesto/TransferenciaModal';
+
+interface EditarSaldoModalProps {
+  cuenta: any;
+  onClose: () => void;
+  onConfirm: (id: string, nuevoSaldo: number) => Promise<void>;
+}
+
+const EditarSaldoModal: React.FC<EditarSaldoModalProps> = ({ cuenta, onClose, onConfirm }) => {
+  const [nuevoSaldo, setNuevoSaldo] = useState(cuenta.saldo.toString());
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const saldoNumerico = parseFloat(nuevoSaldo);
+    if (isNaN(saldoNumerico)) {
+      setError('El saldo debe ser un número válido');
+      return;
+    }
+
+    if (saldoNumerico < 0) {
+      setError('El saldo no puede ser negativo');
+      return;
+    }
+
+    if (!/^\d+(\.\d{0,2})?$/.test(nuevoSaldo)) {
+      setError('El saldo debe tener máximo 2 decimales');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onConfirm(cuenta.id, saldoNumerico);
+      onClose();
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-lg font-medium mb-4 text-gray-900 dark:text-white">
+          Editar Saldo de {cuenta.nombre}
+        </h3>
+        {error && (
+          <div className="mb-4 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Saldo Actual: ${cuenta.saldo.toFixed(2)}
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={nuevoSaldo}
+              onChange={(e) => setNuevoSaldo(e.target.value)}
+              className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              required
+            />
+          </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50"
+            >
+              {loading ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 interface EditarCuentaModalProps {
   cuenta: any;
@@ -86,6 +176,7 @@ export const Presupuesto: React.FC = () => {
     eliminarIngreso,
     agregarCategoriaIngreso,
     editarCategoriaIngreso,
+    editarSaldoCuenta,
     transferirEntreCuentas,
     generarCierreBalance,
     loading,
@@ -102,7 +193,9 @@ export const Presupuesto: React.FC = () => {
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
   const [mostrarTransferencia, setMostrarTransferencia] = useState(false);
   const [cuentaEditar, setCuentaEditar] = useState<any>(null);
+  const [cuentaEditarSaldo, setCuentaEditarSaldo] = useState<any>(null);
   const [mostrarAyuda, setMostrarAyuda] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState('');
 
   // Calculate totals according to new rules
   const totalCuentas = categoriasIngreso.reduce((sum, cuenta) => sum + cuenta.saldo, 0);
@@ -113,19 +206,30 @@ export const Presupuesto: React.FC = () => {
 
   const handleSubmitIngreso = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validación de campos obligatorios
     if (nuevoIngreso.descripcion && nuevoIngreso.monto && nuevoIngreso.cuenta) {
       try {
+        // Crear nuevo ingreso con datos correctos
         await agregarIngreso({
           descripcion: nuevoIngreso.descripcion,
           monto: Number(nuevoIngreso.monto),
           cuenta: nuevoIngreso.cuenta,
-          fecha: new Date(),
-          categoria: '',
-          saldoDisponible: 0
+          fecha: new Date(), // Usar la fecha actual
+          categoria: '', // Categoría por defecto, si no se especifica
+          saldoDisponible: 0 // Saldo inicial por defecto
         });
-        setNuevoIngreso({ descripcion: '', monto: '', cuenta: '' });
+  
+        // Resetear el formulario, incluyendo fecha formateada
+        setNuevoIngreso({
+          descripcion: '',
+          monto: '',
+          cuenta: ''
+        });
+  
       } catch (error) {
-        // Error is handled by the store
+        // Manejo de errores a través del store
+        console.error('Error al agregar el ingreso:', error);
       }
     }
   };
@@ -169,6 +273,16 @@ export const Presupuesto: React.FC = () => {
     }
   };
 
+  const handleEditarSaldo = async (id: string, nuevoSaldo: number) => {
+    try {
+      await editarSaldoCuenta(id, nuevoSaldo);
+      setMensajeExito('Saldo actualizado correctamente');
+      setTimeout(() => setMensajeExito(''), 3000);
+    } catch (error: any) {
+      console.error('Error al editar saldo:', error);
+    }
+  };
+
   const formatDate = (date: any) => {
     if (!date) return '';
     try {
@@ -179,7 +293,6 @@ export const Presupuesto: React.FC = () => {
       return '';
     }
   };
-
 
   return (
     <div className="space-y-6">
@@ -225,27 +338,48 @@ export const Presupuesto: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800 dark:text-white">Cuentas</h2>
-          <button
-            onClick={() => setMostrarTransferencia(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-          >
-            <ArrowRightLeft className="h-5 w-5 mr-2" />
-            Transferir
-          </button>
+          <div className="flex items-center space-x-2">
+            {mensajeExito && (
+              <span className="text-green-600 dark:text-green-400 text-sm">
+                {mensajeExito}
+              </span>
+            )}
+            <button
+              onClick={() => setMostrarTransferencia(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <ArrowRightLeft className="h-5 w-5 mr-2" />
+              Transferir
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {categoriasIngreso.map((cuenta) => (
             <div key={cuenta.id} className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-800 dark:text-white">{cuenta.nombre}</h3>
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center">
+                  <h3 className="text-lg font-medium text-gray-800 dark:text-white">{cuenta.nombre}</h3>
+                  <button
+                    onClick={() => setCuentaEditar(cuenta)}
+                    className="ml-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                    title="Editar nombre"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                  ${cuenta.saldo.toFixed(2)}
+                </p>
                 <button
-                  onClick={() => setCuentaEditar(cuenta)}
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  onClick={() => setCuentaEditarSaldo(cuenta)}
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                  title="Editar saldo"
                 >
                   <Edit2 className="h-4 w-4" />
                 </button>
               </div>
-              <p className="text-xl font-bold text-green-600 dark:text-green-400">${cuenta.saldo.toFixed(2)}</p>
             </div>
           ))}
         </div>
@@ -412,6 +546,14 @@ export const Presupuesto: React.FC = () => {
           cuenta={cuentaEditar}
           onClose={() => setCuentaEditar(null)}
           onConfirm={handleEditarCuenta}
+        />
+      )}
+
+      {cuentaEditarSaldo && (
+        <EditarSaldoModal
+          cuenta={cuentaEditarSaldo}
+          onClose={() => setCuentaEditarSaldo(null)}
+          onConfirm={handleEditarSaldo}
         />
       )}
 
