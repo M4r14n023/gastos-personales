@@ -6,11 +6,11 @@ import { Resumen } from './Resumen';
 import { Presupuesto } from './Presupuesto';
 import { ListaCreditos } from './Creditos/ListaCreditos';
 import { GestionDolares } from './Dolares/GestionDolares';
-import HistorialMovimientos from './HistorialMovimientos';
+import { FixedExpensesDashboard } from './FixedExpenses/FixedExpensesDashboard';
 import { ThemeToggle } from './ThemeToggle';
 import { useStore } from '../store/useStore';
 import { auth } from '../config/firebase';
-import { LayoutGrid, PlusCircle, List, LogOut, Wallet, CreditCard, DollarSign } from 'lucide-react';
+import { LayoutGrid, PlusCircle, List, LogOut, Wallet, CreditCard, DollarSign, ClipboardList } from 'lucide-react';
 import { OfflineIndicator } from './OfflineIndicator';
 
 export const Dashboard: React.FC = () => {
@@ -43,6 +43,7 @@ export const Dashboard: React.FC = () => {
     { id: 'dashboard', name: 'Dashboard', icon: LayoutGrid },
     { id: 'nuevo', name: 'Nuevo Gasto', icon: PlusCircle },
     { id: 'lista', name: 'Lista de Gastos', icon: List },
+    { id: 'gastosFijos', name: 'Gastos Fijos', icon: ClipboardList },
     { id: 'presupuesto', name: 'Presupuesto', icon: Wallet },
     { id: 'creditos', name: 'Créditos', icon: CreditCard },
     { id: 'dolares', name: 'Dólares', icon: DollarSign },
@@ -133,6 +134,7 @@ export const Dashboard: React.FC = () => {
           )}
           {activeTab === 'nuevo' && <NuevoGasto />}
           {activeTab === 'lista' && <ListaGastos />}
+          {activeTab === 'gastosFijos' && <FixedExpensesDashboard />}
           {activeTab === 'presupuesto' && <Presupuesto />}
           {activeTab === 'creditos' && <ListaCreditos />}
           {activeTab === 'dolares' && <GestionDolares />}
