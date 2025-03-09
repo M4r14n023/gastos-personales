@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { Gasto } from '../../types';
 
@@ -19,39 +19,64 @@ export const createGastosSlice: StateCreator<GastosSlice> = (set, get) => ({
     const user = auth.currentUser;
     if (!user) return;
 
-    const gastosSnapshot = await getDocs(
-      query(collection(db, 'gastos'), where('userId', '==', user.uid))
-    );
-    
-    const gastos = gastosSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Gasto[];
+    try {
+      const gastosSnapshot = await getDocs(
+        query(collection(db, 'gastos'), where('userId', '==', user.uid))
+      );
+      
+      const gastos = gastosSnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Ensure proper date conversion
+        const fecha = data.fecha ? new Date(data.fecha.seconds * 1000) : new Date();
+        
+        return {
+          id: doc.id,
+          ...data,
+          fecha,
+          monto: Number(data.monto),
+          montoPagado: Number(data.montoPagado || 0)
+        };
+      }) as Gasto[];
 
-    set({ gastos });
+      set({ gastos });
+    } catch (error) {
+      console.error('Error loading gastos:', error);
+      throw error;
+    }
   },
+
 
   agregarGasto: async (gasto) => {
     const user = auth.currentUser;
     if (!user) throw new Error('Usuario no autenticado');
 
-    const gastoDoc = await addDoc(collection(db, 'gastos'), {
-      ...gasto,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-
-    // If it's not a fixed expense and has an account, update the account balance
-    if (!gasto.esFijo && gasto.cuenta) {
-      const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
-      await updateDoc(cuentaRef, {
-        saldo: get().categoriasIngreso.find(c => c.id === gasto.cuenta)!.saldo - gasto.monto,
+    try {
+      const gastoDoc = await addDoc(collection(db, 'gastos'), {
+        ...gasto,
+        userId: user.uid,
+        montoPagado: gasto.esFijo ? 0 : gasto.monto,
+        estadoPago: gasto.esFijo ? 'pendiente' : 'pagado',
+        pagos: [],
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-    }
 
-    await get().cargarGastos();
+      if (!gasto.esFijo && gasto.cuenta) {
+        const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
+        const cuentaDoc = await getDoc(cuentaRef);
+        if (cuentaDoc.exists()) {
+          await updateDoc(cuentaRef, {
+            saldo: cuentaDoc.data().saldo - gasto.monto,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+
+      await get().cargarGastos();
+    } catch (error) {
+      console.error('Error adding gasto:', error);
+      throw error;
+    }
   },
 
   eliminarGasto: async (id) => {
