@@ -56,10 +56,15 @@ export const ListaGastos: React.FC = () => {
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return '-';
     try {
-      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      // Handle Firestore Timestamp
+      const dateObj = typeof date === 'object' && 'toDate' in date 
+        ? date.toDate() 
+        : new Date(date);
+      
       if (isNaN(dateObj.getTime())) return '-';
       return format(dateObj, 'dd/MM/yyyy', { locale: es });
-    } catch {
+    } catch (error) {
+      console.error('Error formatting date:', error);
       return '-';
     }
   };

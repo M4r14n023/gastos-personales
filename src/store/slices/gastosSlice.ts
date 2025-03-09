@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, serverTimestamp, deleteDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { Gasto } from '../../types';
 
@@ -19,63 +19,90 @@ export const createGastosSlice: StateCreator<GastosSlice> = (set, get) => ({
     const user = auth.currentUser;
     if (!user) return;
 
-    const gastosSnapshot = await getDocs(
-      query(collection(db, 'gastos'), where('userId', '==', user.uid))
-    );
-    
-    const gastos = gastosSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Gasto[];
+    try {
+      const gastosSnapshot = await getDocs(
+        query(collection(db, 'gastos'), where('userId', '==', user.uid))
+      );
+      
+      const gastos = gastosSnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Ensure proper date conversion
+        const fecha = data.fecha ? new Date(data.fecha.seconds * 1000) : new Date();
+        
+        return {
+          id: doc.id,
+          ...data,
+          fecha,
+          monto: Number(data.monto),
+          montoPagado: Number(data.montoPagado || 0)
+        };
+      }) as Gasto[];
 
-    set({ gastos });
+      set({ gastos });
+    } catch (error) {
+      console.error('Error loading gastos:', error);
+      throw error;
+    }
   },
 
   agregarGasto: async (gasto) => {
     const user = auth.currentUser;
     if (!user) throw new Error('Usuario no autenticado');
 
-    const gastoDoc = await addDoc(collection(db, 'gastos'), {
-      ...gasto,
-      userId: user.uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-
-    // If it's not a fixed expense and has an account, update the account balance
-    if (!gasto.esFijo && gasto.cuenta) {
-      const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
-      await updateDoc(cuentaRef, {
-        saldo: get().categoriasIngreso.find(c => c.id === gasto.cuenta)!.saldo - gasto.monto,
+    try {
+      const gastoDoc = await addDoc(collection(db, 'gastos'), {
+        ...gasto,
+        userId: user.uid,
+        montoPagado: gasto.esFijo ? 0 : gasto.monto,
+        estadoPago: gasto.esFijo ? 'pendiente' : 'pagado',
+        pagos: [],
+        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-    }
 
-    await get().cargarGastos();
+      if (!gasto.esFijo && gasto.cuenta) {
+        const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
+        const cuentaDoc = await getDoc(cuentaRef);
+        if (cuentaDoc.exists()) {
+          await updateDoc(cuentaRef, {
+            saldo: cuentaDoc.data().saldo - gasto.monto,
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+
+      await get().cargarGastos();
+    } catch (error) {
+      console.error('Error adding gasto:', error);
+      throw error;
+    }
   },
 
   eliminarGasto: async (id) => {
     const user = auth.currentUser;
     if (!user) throw new Error('Usuario no autenticado');
 
-    // Get the expense first to check if we need to update account balance
-    const gasto = get().gastos.find(g => g.id === id);
-    if (!gasto) throw new Error('Gasto no encontrado');
+    try {
+      const gasto = get().gastos.find(g => g.id === id);
+      if (!gasto) throw new Error('Gasto no encontrado');
 
-    // If it's not a fixed expense and has an account, restore the account balance
-    if (!gasto.esFijo && gasto.cuenta) {
-      const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
-      await updateDoc(cuentaRef, {
-        saldo: get().categoriasIngreso.find(c => c.id === gasto.cuenta)!.saldo + gasto.montoPagado,
-        updatedAt: serverTimestamp()
-      });
+      if (!gasto.esFijo && gasto.cuenta) {
+        const cuentaRef = doc(db, 'categoriasIngreso', gasto.cuenta);
+        const cuentaDoc = await getDoc(cuentaRef);
+        if (cuentaDoc.exists()) {
+          await updateDoc(cuentaRef, {
+            saldo: cuentaDoc.data().saldo + (gasto.montoPagado || 0),
+            updatedAt: serverTimestamp()
+          });
+        }
+      }
+
+      await deleteDoc(doc(db, 'gastos', id));
+      await get().cargarGastos();
+    } catch (error) {
+      console.error('Error deleting gasto:', error);
+      throw error;
     }
-
-    // Delete the expense
-    await deleteDoc(doc(db, 'gastos', id));
-
-    // Reload data
-    await get().cargarGastos();
   },
 
   eliminarTodosLosGastos: async () => {
@@ -85,68 +112,109 @@ export const createGastosSlice: StateCreator<GastosSlice> = (set, get) => ({
     const batch = writeBatch(db);
     const { gastos, categoriasIngreso } = get();
 
-    // First, restore all account balances for non-fixed expenses
-    const balanceUpdates = new Map<string, number>();
-    gastos.forEach(gasto => {
-      if (!gasto.esFijo && gasto.cuenta && gasto.montoPagado > 0) {
-        const currentBalance = balanceUpdates.get(gasto.cuenta) || 0;
-        balanceUpdates.set(gasto.cuenta, currentBalance + gasto.montoPagado);
-      }
-    });
+    try {
+      const balanceUpdates = new Map<string, number>();
+      gastos.forEach(gasto => {
+        if (!gasto.esFijo && gasto.cuenta && gasto.montoPagado > 0) {
+          const currentBalance = balanceUpdates.get(gasto.cuenta) || 0;
+          balanceUpdates.set(gasto.cuenta, currentBalance + gasto.montoPagado);
+        }
+      });
 
-    // Update account balances
-    for (const [cuentaId, montoRestaurar] of balanceUpdates.entries()) {
-      const cuenta = categoriasIngreso.find(c => c.id === cuentaId);
-      if (cuenta) {
-        const cuentaRef = doc(db, 'categoriasIngreso', cuentaId);
-        batch.update(cuentaRef, {
-          saldo: cuenta.saldo + montoRestaurar,
-          updatedAt: serverTimestamp()
-        });
+      for (const [cuentaId, montoRestaurar] of balanceUpdates.entries()) {
+        const cuenta = categoriasIngreso.find(c => c.id === cuentaId);
+        if (cuenta) {
+          const cuentaRef = doc(db, 'categoriasIngreso', cuentaId);
+          batch.update(cuentaRef, {
+            saldo: cuenta.saldo + montoRestaurar,
+            updatedAt: serverTimestamp()
+          });
+        }
       }
+
+      const gastosSnapshot = await getDocs(
+        query(collection(db, 'gastos'), where('userId', '==', user.uid))
+      );
+      
+      gastosSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      await get().cargarGastos();
+    } catch (error) {
+      console.error('Error deleting all gastos:', error);
+      throw error;
     }
-
-    // Delete all expenses
-    const gastosSnapshot = await getDocs(
-      query(collection(db, 'gastos'), where('userId', '==', user.uid))
-    );
-    
-    gastosSnapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    // Commit all changes
-    await batch.commit();
-
-    // Reload data
-    await get().cargarGastos();
   },
 
   registrarPago: async (id, monto, cuenta) => {
     const user = auth.currentUser;
     if (!user) throw new Error('Usuario no autenticado');
 
-    const gasto = get().gastos.find(g => g.id === id);
-    if (!gasto) throw new Error('Gasto no encontrado');
+    try {
+      const gastoRef = doc(db, 'gastos', id);
+      const gastoDoc = await getDoc(gastoRef);
+      
+      if (!gastoDoc.exists()) {
+        throw new Error('Gasto no encontrado');
+      }
 
-    const montoRestante = gasto.monto - gasto.montoPagado;
-    if (monto > montoRestante) throw new Error('El monto excede el saldo pendiente');
+      const gasto = { id: gastoDoc.id, ...gastoDoc.data() } as Gasto;
+      const montoRestante = gasto.monto - (gasto.montoPagado || 0);
+      
+      if (monto > montoRestante) {
+        throw new Error('El monto excede el saldo pendiente');
+      }
 
-    // Update account balance
-    const cuentaRef = doc(db, 'categoriasIngreso', cuenta);
-    await updateDoc(cuentaRef, {
-      saldo: get().categoriasIngreso.find(c => c.id === cuenta)!.saldo - monto,
-      updatedAt: serverTimestamp()
-    });
+      const cuentaRef = doc(db, 'categoriasIngreso', cuenta);
+      const cuentaDoc = await getDoc(cuentaRef);
+      
+      if (!cuentaDoc.exists()) {
+        throw new Error('Cuenta no encontrada');
+      }
 
-    // Update expense
-    await updateDoc(doc(db, 'gastos', id), {
-      montoPagado: gasto.montoPagado + monto,
-      estadoPago: gasto.montoPagado + monto >= gasto.monto ? 'pagado' : 'parcial',
-      updatedAt: serverTimestamp()
-    });
+      const cuentaData = cuentaDoc.data();
+      if (cuentaData.saldo < monto) {
+        throw new Error('Saldo insuficiente en la cuenta');
+      }
 
-    // Reload data
-    await get().cargarGastos();
+      const batch = writeBatch(db);
+
+      batch.update(cuentaRef, {
+        saldo: cuentaData.saldo - monto,
+        updatedAt: serverTimestamp()
+      });
+
+      const pagoRef = doc(collection(db, 'pagos'));
+      const pagoData = {
+        gastoId: id,
+        cuenta,
+        monto,
+        fecha: serverTimestamp(),
+        userId: user.uid
+      };
+      
+      batch.set(pagoRef, pagoData);
+
+      const nuevoMontoPagado = (gasto.montoPagado || 0) + monto;
+      const nuevoEstadoPago = nuevoMontoPagado >= gasto.monto ? 'pagado' : 'parcial';
+      
+      batch.update(gastoRef, {
+        montoPagado: nuevoMontoPagado,
+        estadoPago: nuevoEstadoPago,
+        pagos: [...(gasto.pagos || []), {
+          id: pagoRef.id,
+          ...pagoData
+        }],
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      await get().cargarGastos();
+    } catch (error) {
+      console.error('Error registering payment:', error);
+      throw error;
+    }
   }
 });
